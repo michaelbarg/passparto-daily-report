@@ -25,16 +25,15 @@
 - [x] **`scripts/status.py`** — כלי סטטוס חי שמושך מ-Render API את המצב האמיתי בכל רגע.
 - [x] **PR #1 ממוזג, נפרס, ורצה ב-Render** — commit `b22b779b` הוא ה-deploy הפעיל.
 - [x] **ריצה ראשונה ידנית בוצעה** — `job-d8a145p9rddc739ma0l0`, succeeded (11m 35s), 09:10–09:22 UTC ב-25.05.
+- [x] **Shopify env vars מקושרים דרך env-group `cotton-sync-secrets`** — `SHOPIFY_STORE_URL` + `SHOPIFY_ADMIN_TOKEN`. הקוד מקבל את כל הוריאציות הללו (`SHOPIFY_STORE_DOMAIN` / `SHOPIFY_STORE_URL` / `SHOPIFY_DOMAIN`, ו-`SHOPIFY_ADMIN_API_TOKEN` / `SHOPIFY_ADMIN_TOKEN` / `SHOPIFY_TOKEN`), ומנקה http(s) ועריכה אם הערך הוא URL מלא.
+- [x] **`status.py` מעודכן** — מציג גם משתנים שמגיעים דרך linked env-groups, כולל איזה group מספק כל אחד.
 
 ## מה פתוח
 
-- [ ] **שני env vars ב-Render שייתנו את ה"סריקה החיה" של Shopify:**
-  - `SHOPIFY_STORE_DOMAIN` (כנראה `passparto.myshopify.com`)
-  - `SHOPIFY_ADMIN_API_TOKEN` (`shpat_...`) — או באליאסים `SHOPIFY_ADMIN_TOKEN` / `SHOPIFY_TOKEN` שגם הקוד מקבל.
-
-  עד שזה לא מוגדר, טבלת ההזמנות נבנית מ-Klaviyo events (Placed Order שלא קיבלו Fulfilled Order ב-14 הימים האחרונים) — עובד, אבל פחות מדויק מהסריקה הישירה.
-
-- [ ] **סיבוב `RENDER_API_KEY` הקיים** — נחשף בצ'אט בריצה הראשונית. לסבב ב-https://dashboard.render.com/u/settings#api-keys.
+- [ ] **סיבוב סודות שנחשפו בצ'אט.** Render API החזיר את כל הסודות בערכים גלויים כשהשתמשתי ב-`RENDER_API_KEY`. כדאי לסובב:
+  - `RENDER_API_KEY` ([dashboard](https://dashboard.render.com/u/settings#api-keys))
+  - `KLAVIYO_KEY` (Klaviyo: Profile → Account → API Keys)
+  - `ANTHROPIC_API_KEY` ([Console](https://console.anthropic.com))
 
 - [ ] **תיקון DST** (אופציונלי, לא דחוף) — Render cron הוא UTC. אפשר להוסיף ל-`main.py` בדיקה שמדלגת על ריצה כשהיא בכיוון השעון של ישראל לא 06:00, או לעדכן ידנית פעמיים בשנה. נכון לעכשיו `0 3 * * *` נותן 06:00 בקיץ ו-05:00 בחורף.
 

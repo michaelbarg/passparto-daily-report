@@ -97,7 +97,26 @@ def main():
 
     env_resp = requests.get(f"{API}/services/{service_id}/env-vars",
                             params={"limit": 50}, headers=_h(token), timeout=20).json()
-    env_keys = sorted(item.get("envVar", item).get("key", "") for item in env_resp)
+    direct_keys = sorted(item.get("envVar", item).get("key", "") for item in env_resp)
+
+    group_keys = {}
+    try:
+        groups_list = requests.get(f"{API}/env-groups",
+                                   params={"limit": 50},
+                                   headers=_h(token), timeout=20).json()
+        for item in groups_list:
+            g = item.get("envGroup", item)
+            gid = g.get("id")
+            detail = requests.get(f"{API}/env-groups/{gid}",
+                                  headers=_h(token), timeout=20).json()
+            linked = [s.get("name") for s in detail.get("serviceLinks", [])]
+            if any(svc_d.get("name") == n for n in linked):
+                for ev in detail.get("envVars", []):
+                    group_keys[ev.get("key", "")] = g.get("name")
+    except Exception as e:
+        print(f"  [WARN] could not enumerate env groups: {e}")
+
+    env_keys = sorted(set(direct_keys) | set(group_keys.keys()))
 
     jobs = requests.get(f"{API}/services/{service_id}/jobs",
                         params={"limit": 5}, headers=_h(token), timeout=20).json()
@@ -120,28 +139,29 @@ def main():
     print(f"  commit:       {(commit.get('id') or '?')[:8]}  {(commit.get('message') or '').splitlines()[0][:60]}")
     print(f"  finishedAt:   {deploy.get('finishedAt','—')}")
 
-    print(f"\nEnv vars set in Render ({len(env_keys)}):")
+    print(f"\nEnv vars available to service ({len(env_keys)}: "
+          f"{len(direct_keys)} direct + {len(group_keys)} via groups):")
     expected = [
-        ("KLAVIYO_KEY",                "Klaviyo events + reporting"),
-        ("ANTHROPIC_API_KEY",          "AI insight generator"),
-        ("MICHAEL_EMAIL",              "Recipient profile email"),
-        ("KLAVIYO_PLACED_ORDER_METRIC_ID", "Skips a metric-discovery call (optional)"),
-        ("SHOPIFY_STORE_DOMAIN",       "Shopify domain (preferred for live order scan)"),
-        ("SHOPIFY_ADMIN_API_TOKEN",    "Shopify admin token (or SHOPIFY_ADMIN_TOKEN alias)"),
+        ("KLAVIYO_KEY",                ["KLAVIYO_KEY"],                                  "Klaviyo events + reporting"),
+        ("ANTHROPIC_API_KEY",          ["ANTHROPIC_API_KEY"],                            "AI insight generator"),
+        ("MICHAEL_EMAIL",              ["MICHAEL_EMAIL"],                                "Recipient profile email"),
+        ("KLAVIYO_PLACED_ORDER_METRIC_ID", ["KLAVIYO_PLACED_ORDER_METRIC_ID"],           "Skips a metric-discovery call"),
+        ("SHOPIFY_STORE_DOMAIN",       ["SHOPIFY_STORE_DOMAIN", "SHOPIFY_STORE_URL", "SHOPIFY_DOMAIN"], "Shopify domain (live order scan)"),
+        ("SHOPIFY_ADMIN_API_TOKEN",    ["SHOPIFY_ADMIN_API_TOKEN", "SHOPIFY_ADMIN_TOKEN", "SHOPIFY_TOKEN"], "Shopify admin token"),
     ]
-    for key, desc in expected:
-        present = "✓" if key in env_keys else " "
-        alias_present = ""
-        if key == "SHOPIFY_ADMIN_API_TOKEN" and "SHOPIFY_ADMIN_API_TOKEN" not in env_keys:
-            for alias in ("SHOPIFY_ADMIN_TOKEN", "SHOPIFY_TOKEN"):
-                if alias in env_keys:
-                    present = "✓"
-                    alias_present = f" (as {alias})"
-                    break
-        print(f"  [{present}] {key:35} — {desc}{alias_present}")
-    extras = [k for k in env_keys if not any(k == ek or k in ("SHOPIFY_ADMIN_TOKEN","SHOPIFY_TOKEN","SHOPIFY_DOMAIN") for ek, _ in expected)]
-    if extras:
-        print(f"\n  Extra keys not in expected list: {', '.join(extras)}")
+    matched = set()
+    for canonical, aliases, desc in expected:
+        found = next((a for a in aliases if a in env_keys), None)
+        present = "✓" if found else " "
+        suffix = ""
+        if found:
+            matched.add(found)
+            via = group_keys.get(found, "service")
+            if found != canonical:
+                suffix = f"  (as {found})"
+            if via != "service":
+                suffix += f"  [via env-group: {via}]"
+        print(f"  [{present}] {canonical:32}{suffix}  — {desc}")
 
     print(f"\nRecent job runs ({len(jobs)}):")
     if not jobs:
