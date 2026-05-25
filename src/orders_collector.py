@@ -70,10 +70,10 @@ SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2024-10").strip()
 SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "").strip()
 SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip()
 
-# How far back to look when fetching unfulfilled orders from Shopify.
-# Default 30 days: covers normal shipping delays without dragging in
-# hundreds of stale legacy orders. Set to 0 to disable the date filter.
-SHOPIFY_LOOKBACK_DAYS = int(os.environ.get("SHOPIFY_LOOKBACK_DAYS", "30"))
+# Minimum order number to include in the report. Orders below this are
+# considered legacy / pre-cutover and skipped even if still unfulfilled.
+# (The operator picked #1776 as the start of the new operations window.)
+SHOPIFY_MIN_ORDER_NUMBER = int(os.environ.get("SHOPIFY_MIN_ORDER_NUMBER", "1776"))
 
 LOOKBACK_DAYS = int(os.environ.get("UNFULFILLED_LOOKBACK_DAYS", "14"))
 MAX_ORDERS_IN_EMAIL = int(os.environ.get("UNFULFILLED_MAX_IN_EMAIL", "50"))
@@ -442,10 +442,16 @@ def _from_shopify():
         "X-Shopify-Access-Token": token,
         "accept": "application/json",
     }
+    # Operator-specified filters for "orders needing fulfillment":
+    #   status=open                — not cancelled/archived
+    #   fulfillment_status=unfulfilled  — strictly NOT shipped (excludes partial)
+    #   financial_status=paid      — fully paid (excludes authorized / partial)
+    # In Python we further drop ₪0 totals and orders below the operator's
+    # cutover number (default #1776).
     params = {
-        "status": "any",
-        "fulfillment_status": "unfulfilled,partial",
-        "financial_status": "paid,partially_paid,authorized,partially_refunded",
+        "status": "open",
+        "fulfillment_status": "unfulfilled",
+        "financial_status": "paid",
         "limit": 250,
         "fields": (
             "id,name,created_at,total_price,currency,fulfillment_status,"
@@ -453,12 +459,10 @@ def _from_shopify():
             "billing_address,line_items,phone,note"
         ),
     }
-    if SHOPIFY_LOOKBACK_DAYS > 0:
-        cutoff = datetime.now(timezone.utc) - timedelta(days=SHOPIFY_LOOKBACK_DAYS)
-        params["created_at_min"] = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    print(f"    Shopify: GET {SHOPIFY_STORE_DOMAIN}/admin/.../orders.json"
-          f" (fulfillment_status=unfulfilled,partial, last {SHOPIFY_LOOKBACK_DAYS} days)")
+    print(f"    Shopify: GET {SHOPIFY_STORE_DOMAIN}/admin/.../orders.json "
+          f"(status=open, fulfillment_status=unfulfilled, "
+          f"financial_status=paid, name>=#{SHOPIFY_MIN_ORDER_NUMBER}, total>0)")
 
     orders = []
     url = base
@@ -493,8 +497,24 @@ def _from_shopify():
 
     now = datetime.now(timezone.utc)
     rows = []
+    skipped_below_cutoff = 0
+    skipped_zero_total = 0
     for o in orders:
         if o.get("cancelled_at") or o.get("closed_at"):
+            continue
+
+        try:
+            total_val = float(o.get("total_price") or 0)
+        except Exception:
+            total_val = 0.0
+        if total_val <= 0:
+            skipped_zero_total += 1
+            continue
+
+        order_num_digits = "".join(c for c in (o.get("name") or "") if c.isdigit())
+        order_num_int = int(order_num_digits) if order_num_digits else 0
+        if order_num_int and order_num_int < SHOPIFY_MIN_ORDER_NUMBER:
+            skipped_below_cutoff += 1
             continue
 
         ship = o.get("shipping_address") or o.get("billing_address") or {}
@@ -553,6 +573,10 @@ def _from_shopify():
 
         if len(rows) >= MAX_ORDERS_IN_EMAIL:
             break
+
+    if skipped_below_cutoff or skipped_zero_total:
+        print(f"      filtered out: {skipped_below_cutoff} below #{SHOPIFY_MIN_ORDER_NUMBER}, "
+              f"{skipped_zero_total} with ₪0 total")
 
     rows.sort(key=lambda r: r["days_open"], reverse=True)
     return rows
