@@ -295,6 +295,72 @@ def _shopify_items_summary(line_items, max_items=3):
     return ", ".join(parts)
 
 
+def _shopify_line_items_detail(line_items):
+    """One dict per Shopify line item with product/size/quantity for the table."""
+    out = []
+    if not isinstance(line_items, list):
+        return out
+    for it in line_items:
+        if not isinstance(it, dict):
+            continue
+        product = it.get("title") or it.get("name") or ""
+        size = it.get("variant_title") or ""
+        if size in (None, "Default Title"):
+            size = ""
+        qty = it.get("quantity") or 1
+        if product:
+            out.append({"product": product, "size": size, "quantity": qty})
+    return out
+
+
+def _klaviyo_line_items_detail(items):
+    """One dict per Klaviyo Placed-Order Item with product/size/quantity."""
+    out = []
+    if not isinstance(items, list):
+        return out
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        product = (
+            it.get("Product Name")
+            or it.get("ProductName")
+            or it.get("Title")
+            or it.get("title")
+            or it.get("name")
+            or ""
+        )
+        size = (
+            it.get("Variant Name")
+            or it.get("VariantName")
+            or it.get("Variant Title")
+            or it.get("VariantTitle")
+            or it.get("variant_title")
+            or it.get("variant")
+            or ""
+        )
+        if size in (None, "Default Title"):
+            size = ""
+        qty = it.get("Quantity") or it.get("quantity") or 1
+        if product:
+            out.append({"product": product, "size": size, "quantity": qty})
+    return out
+
+
+def _short_order_number(name, order_id):
+    """Strip the '#' prefix from a Shopify order name.
+
+    Passparto's order numbers are natively 4 digits (e.g. '#2142'), so
+    no truncation is applied — we just remove the '#' and any non-digit
+    characters. If a future order grows to 5+ digits this still returns
+    the full number rather than chopping it.
+    """
+    raw = (name or "").strip().lstrip("#")
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if not digits:
+        digits = "".join(ch for ch in str(order_id or "") if ch.isdigit())
+    return digits
+
+
 def _from_shopify():
     """Pull live unfulfilled orders straight from the Shopify Admin API."""
     base = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}/orders.json"
@@ -387,16 +453,25 @@ def _from_shopify():
         except Exception:
             total_str = str(o.get("total_price") or "0")
 
+        order_id_str = str(o.get("id", ""))
+        admin_url = (
+            f"https://{SHOPIFY_STORE_DOMAIN}/admin/orders/{order_id_str}"
+            if SHOPIFY_STORE_DOMAIN and order_id_str else ""
+        )
         rows.append({
-            "order_number":  o.get("name") or f"#{o.get('id','')}",
-            "order_id":      str(o.get("id", "")),
-            "placed_at":     placed_str,
-            "days_open":     days_open,
-            "customer_name": customer_name,
-            "address":       _shopify_format_address(ship),
-            "phone":         phone,
-            "items_summary": _shopify_items_summary(o.get("line_items") or []),
-            "total":         total_str,
+            "order_number":       o.get("name") or f"#{o.get('id','')}",
+            "order_number_short": _short_order_number(o.get("name"), o.get("id")),
+            "order_id":           order_id_str,
+            "order_admin_url":    admin_url,
+            "placed_at":          placed_str,
+            "days_open":          days_open,
+            "is_new_today":       days_open == 0,
+            "customer_name":      customer_name,
+            "address":            _shopify_format_address(ship),
+            "phone":              phone,
+            "items_summary":      _shopify_items_summary(o.get("line_items") or []),
+            "line_items_detail":  _shopify_line_items_detail(o.get("line_items") or []),
+            "total":              total_str,
         })
 
         if len(rows) >= MAX_ORDERS_IN_EMAIL:
@@ -518,16 +593,25 @@ def _from_klaviyo():
         if not phone and profile_attrs:
             phone = profile_attrs.get("phone_number", "") or ""
 
+        days_open_val = _days_open(placed_iso, now)
+        admin_url = (
+            f"https://{SHOPIFY_STORE_DOMAIN}/admin/orders/{oid}"
+            if SHOPIFY_STORE_DOMAIN and oid else ""
+        )
         rows.append({
-            "order_number":  order_number_str,
-            "order_id":      oid,
-            "placed_at":     placed_str,
-            "days_open":     _days_open(placed_iso, now),
-            "customer_name": _customer_name(ev, profile_attrs),
-            "address":       _format_address(ship),
-            "phone":         phone,
-            "items_summary": _items_summary(ev),
-            "total":         total_str,
+            "order_number":       order_number_str,
+            "order_number_short": _short_order_number(order_number_str, oid),
+            "order_id":           oid,
+            "order_admin_url":    admin_url,
+            "placed_at":          placed_str,
+            "days_open":          days_open_val,
+            "is_new_today":       days_open_val == 0,
+            "customer_name":      _customer_name(ev, profile_attrs),
+            "address":            _format_address(ship),
+            "phone":              phone,
+            "items_summary":      _items_summary(ev),
+            "line_items_detail":  _klaviyo_line_items_detail(props.get("Items") or []),
+            "total":              total_str,
         })
 
         if len(rows) >= MAX_ORDERS_IN_EMAIL:

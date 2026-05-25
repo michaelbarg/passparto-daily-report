@@ -318,6 +318,20 @@ def collect_all():
     print("  Fetching unfulfilled orders...")
     unfulfilled_orders = get_unfulfilled_orders()
 
+    unfulfilled_items = []
+    for o in unfulfilled_orders:
+        for li in o.get("line_items_detail") or []:
+            unfulfilled_items.append({
+                "product": li["product"],
+                "size": li["size"],
+                "quantity": li["quantity"],
+                "order_number_short": o.get("order_number_short", ""),
+                "order_admin_url": o.get("order_admin_url", ""),
+                "is_new_today": o.get("is_new_today", False),
+            })
+
+    new_orders_count = sum(1 for o in unfulfilled_orders if o.get("is_new_today"))
+
     summary = _build_summary(campaigns, flows)
 
     data = {
@@ -330,6 +344,8 @@ def collect_all():
         'customer_emails': customer_emails,
         'unfulfilled_orders': unfulfilled_orders,
         'unfulfilled_count': len(unfulfilled_orders),
+        'unfulfilled_items': unfulfilled_items,
+        'new_orders_count': new_orders_count,
         'summary': summary,
     }
 
