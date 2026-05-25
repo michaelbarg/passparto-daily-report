@@ -295,8 +295,26 @@ def _shopify_items_summary(line_items, max_items=3):
     return ", ".join(parts)
 
 
+def _split_variant(variant_title):
+    """Split 'Size / Color' into (size, color).
+
+    Shopify joins variant options with ' / '. For Passparto bedding the
+    convention is size first, color second. Single-option variants
+    return ('Size', '') and 'Default Title' becomes ('','').
+    """
+    s = (variant_title or "").strip()
+    if not s or s == "Default Title":
+        return "", ""
+    parts = [p.strip() for p in s.split("/") if p.strip()]
+    if not parts:
+        return "", ""
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " / ".join(parts[1:])
+
+
 def _shopify_line_items_detail(line_items):
-    """One dict per Shopify line item with product/size/quantity for the table."""
+    """One dict per Shopify line item with product/size/color/quantity."""
     out = []
     if not isinstance(line_items, list):
         return out
@@ -304,17 +322,20 @@ def _shopify_line_items_detail(line_items):
         if not isinstance(it, dict):
             continue
         product = it.get("title") or it.get("name") or ""
-        size = it.get("variant_title") or ""
-        if size in (None, "Default Title"):
-            size = ""
+        size, color = _split_variant(it.get("variant_title"))
         qty = it.get("quantity") or 1
         if product:
-            out.append({"product": product, "size": size, "quantity": qty})
+            out.append({
+                "product": product,
+                "size": size,
+                "color": color,
+                "quantity": qty,
+            })
     return out
 
 
 def _klaviyo_line_items_detail(items):
-    """One dict per Klaviyo Placed-Order Item with product/size/quantity."""
+    """One dict per Klaviyo Placed-Order Item with product/size/color/quantity."""
     out = []
     if not isinstance(items, list):
         return out
@@ -329,7 +350,7 @@ def _klaviyo_line_items_detail(items):
             or it.get("name")
             or ""
         )
-        size = (
+        variant = (
             it.get("Variant Name")
             or it.get("VariantName")
             or it.get("Variant Title")
@@ -338,11 +359,15 @@ def _klaviyo_line_items_detail(items):
             or it.get("variant")
             or ""
         )
-        if size in (None, "Default Title"):
-            size = ""
+        size, color = _split_variant(variant)
         qty = it.get("Quantity") or it.get("quantity") or 1
         if product:
-            out.append({"product": product, "size": size, "quantity": qty})
+            out.append({
+                "product": product,
+                "size": size,
+                "color": color,
+                "quantity": qty,
+            })
     return out
 
 

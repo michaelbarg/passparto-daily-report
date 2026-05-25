@@ -323,7 +323,8 @@ def collect_all():
         for li in o.get("line_items_detail") or []:
             unfulfilled_items.append({
                 "product": li["product"],
-                "size": li["size"],
+                "size": li.get("size", ""),
+                "color": li.get("color", ""),
                 "quantity": li["quantity"],
                 "order_number_short": o.get("order_number_short", ""),
                 "order_admin_url": o.get("order_admin_url", ""),
