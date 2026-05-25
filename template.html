@@ -32,70 +32,66 @@
         </tr>
 
         <!-- ════════════════════════════════════════════ -->
-        <!-- SECTION 0: UNFULFILLED ORDERS — THE ACTION LIST -->
+        <!-- SECTION 0: UNFULFILLED ITEMS — THE ACTION LIST -->
         <!-- ════════════════════════════════════════════ -->
         <tr>
           <td style="padding:30px 32px 8px;">
-            <p style="margin:0 0 14px;font-size:13px;color:#1a1a1a;letter-spacing:2px;font-weight:600;border-bottom:2px solid #C62828;padding-bottom:8px;">
-              📦 הזמנות לטיפול ({{ event.unfulfilled_count|default(0) }})
-            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px;">
+              <tr>
+                <td style="border-bottom:2px solid #C62828;padding-bottom:8px;">
+                  <p style="margin:0;font-size:13px;color:#1a1a1a;letter-spacing:2px;font-weight:600;">
+                    📦 הזמנות לטיפול ({{ event.unfulfilled_count|default(0) }})
+                  </p>
+                </td>
+                <td align="left" style="border-bottom:2px solid #C62828;padding-bottom:8px;">
+                  {% if event.new_orders_count and event.new_orders_count > 0 %}
+                  <span style="display:inline-block;padding:3px 10px;border-radius:12px;background:#E8F5E9;color:#1B5E20;font-size:11px;font-weight:600;">
+                    🆕 {{ event.new_orders_count }} חדשות מאתמול
+                  </span>
+                  {% endif %}
+                </td>
+              </tr>
+            </table>
 
-            {% if event.unfulfilled_orders %}
+            {% if event.unfulfilled_items %}
             <table width="100%" cellpadding="0" cellspacing="0" border="0"
-                   style="border-collapse:collapse;font-size:12px;margin-top:6px;border:1px solid #e8e1d4;">
+                   style="border-collapse:collapse;font-size:13px;border:1px solid #e8e1d4;">
               <thead>
                 <tr style="background:#1a1a1a;color:#ffffff;">
-                  <th width="36"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">✓</th>
-                  <th width="80"  align="right"  style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">הזמנה</th>
-                  <th width="78"  align="right"  style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">תאריך</th>
-                  <th width="40"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">ימים</th>
-                  <th               align="right" style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">לקוח</th>
-                  <th               align="right" style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">כתובת למשלוח</th>
-                  <th width="100" align="right"  style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">טלפון</th>
-                  <th width="70"  align="left"   style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;">סכום</th>
+                  <th width="40"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">#</th>
+                  <th               align="right" style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">מוצר</th>
+                  <th width="120" align="right"  style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">מידה</th>
+                  <th width="60"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">כמות</th>
+                  <th width="80"  align="left"   style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;">הזמנה</th>
                 </tr>
               </thead>
               <tbody>
-                {% for o in event.unfulfilled_orders %}
+                {% for item in event.unfulfilled_items %}
                 <tr style="background:{% if loop.index % 2 == 0 %}#faf8f4{% else %}#ffffff{% endif %};">
-                  <td align="center" style="padding:10px 6px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;">
-                    <span style="display:inline-block;width:16px;height:16px;border:1.5px solid {% if o.days_open >= 3 %}#C62828{% else %}#888{% endif %};border-radius:3px;"></span>
+                  <td align="center" style="padding:9px 6px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#666;">
+                    {{ loop.index }}
                   </td>
-                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;direction:ltr;text-align:right;">
-                    <strong style="color:#1a1a1a;">{{ o.order_number }}</strong>
+                  <td align="right" style="padding:9px 10px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#1a1a1a;">
+                    {{ item.product }}
                   </td>
-                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#555;">
-                    {{ o.placed_at }}
+                  <td align="right" style="padding:9px 10px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#555;">
+                    {{ item.size }}
                   </td>
-                  <td align="center" style="padding:10px 6px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;">
-                    <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-weight:600;font-size:11px;
-                                 background:{% if o.days_open >= 3 %}#FFEBEE{% elif o.days_open >= 1 %}#FFF8E1{% else %}#E8F5E9{% endif %};
-                                 color:{% if o.days_open >= 3 %}#C62828{% elif o.days_open >= 1 %}#F57C00{% else %}#2E7D32{% endif %};">
-                      {{ o.days_open }}
-                    </span>
+                  <td align="center" style="padding:9px 6px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;font-weight:600;color:#1a1a1a;">
+                    {{ item.quantity }}
                   </td>
-                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#1a1a1a;">
-                    {{ o.customer_name }}
-                  </td>
-                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#333;line-height:1.4;">
-                    {{ o.address }}
-                    {% if o.items_summary %}
-                    <div style="font-size:11px;color:#888;margin-top:3px;">{{ o.items_summary }}</div>
+                  <td align="left" style="padding:9px 10px;border-bottom:1px solid #eee5d6;direction:ltr;text-align:left;">
+                    {% if item.order_admin_url %}
+                    <a href="{{ item.order_admin_url }}" style="color:#1565C0;font-weight:600;text-decoration:none;">#{{ item.order_number_short }}</a>
+                    {% else %}
+                    <strong style="color:#1a1a1a;">#{{ item.order_number_short }}</strong>
                     {% endif %}
-                  </td>
-                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#555;direction:ltr;text-align:right;font-size:11px;">
-                    {{ o.phone }}
-                  </td>
-                  <td align="left" style="padding:10px 8px;border-bottom:1px solid #eee5d6;color:#1a1a1a;font-weight:600;direction:ltr;">
-                    ₪{{ o.total }}
+                    {% if item.is_new_today %} <span style="color:#2E7D32;font-size:10px;">🆕</span>{% endif %}
                   </td>
                 </tr>
                 {% endfor %}
               </tbody>
             </table>
-            <p style="margin:8px 0 0;font-size:11px;color:#888;text-align:right;">
-              ▢ סמן ✓ אחרי שההזמנה טופלה. שורות באדום = פתוחות 3+ ימים.
-            </p>
             {% else %}
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
