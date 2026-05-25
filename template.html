@@ -37,7 +37,7 @@
         <tr>
           <td style="padding:30px 32px 8px;">
             <p style="margin:0 0 14px;font-size:13px;color:#1a1a1a;letter-spacing:2px;font-weight:600;border-bottom:2px solid #C62828;padding-bottom:8px;">
-              📦 הזמנות לטיפול ({{ event.unfulfilled_count|default:0 }})
+              📦 הזמנות לטיפול ({{ event.unfulfilled_count|default(0) }})
             </p>
 
             {% if event.unfulfilled_orders %}
@@ -57,7 +57,7 @@
               </thead>
               <tbody>
                 {% for o in event.unfulfilled_orders %}
-                <tr style="background:{% if forloop.counter|divisibleby:2 %}#faf8f4{% else %}#ffffff{% endif %};">
+                <tr style="background:{% if loop.index % 2 == 0 %}#faf8f4{% else %}#ffffff{% endif %};">
                   <td align="center" style="padding:10px 6px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;">
                     <span style="display:inline-block;width:16px;height:16px;border:1.5px solid {% if o.days_open >= 3 %}#C62828{% else %}#888{% endif %};border-radius:3px;"></span>
                   </td>
@@ -208,7 +208,7 @@
               </thead>
               <tbody>
                 {% for c in event.campaigns %}
-                <tr style="background:{% if forloop.counter|divisibleby:2 %}#f7fbff{% else %}#ffffff{% endif %};">
+                <tr style="background:{% if loop.index % 2 == 0 %}#f7fbff{% else %}#ffffff{% endif %};">
                   <td align="right"  style="padding:8px 10px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;color:#1a1a1a;">{{ c.name }}</td>
                   <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ c.yesterday.sent }}</td>
                   <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ c.yesterday.open_rate }}%</td>
@@ -245,7 +245,7 @@
               </thead>
               <tbody>
                 {% for f in event.flows %}
-                <tr style="background:{% if forloop.counter|divisibleby:2 %}#f4faf4{% else %}#ffffff{% endif %};">
+                <tr style="background:{% if loop.index % 2 == 0 %}#f4faf4{% else %}#ffffff{% endif %};">
                   <td align="right"  style="padding:8px 10px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;color:#1a1a1a;">{{ f.name }}</td>
                   <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ f.yesterday.sent }}</td>
                   <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ f.yesterday.open_rate }}%</td>
