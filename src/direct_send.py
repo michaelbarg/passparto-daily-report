@@ -18,7 +18,7 @@ from email_payload import build_event_dict
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 
 REPORT_FROM_EMAIL = os.environ.get(
-    "REPORT_FROM_EMAIL", "support@passparto.co.il"
+    "REPORT_FROM_EMAIL", "reports@passparto.com"
 ).strip()
 REPORT_FROM_NAME = os.environ.get(
     "REPORT_FROM_NAME", "פספרטו · דוח יומי"
