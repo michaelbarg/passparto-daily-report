@@ -17,6 +17,7 @@ load_dotenv()
 from data_collector import collect_all
 from insights_generator import generate_insight
 from klaviyo_event import send_daily_report_event
+from direct_send import send_direct, RESEND_API_KEY
 
 
 def main():
@@ -37,10 +38,18 @@ def main():
         print(f"  Insight: {insight}")
 
         if args.dry_run:
-            print("\n  --dry-run: event NOT sent.")
+            print("\n  --dry-run: email NOT sent.")
             return
 
-        print("\n[3/3] Sending event to Klaviyo...")
+        if RESEND_API_KEY:
+            print("\n[3/3] Delivering email directly via Resend (bypassing Klaviyo Flow)...")
+            success = send_direct(data, insight)
+            if success:
+                print("\n  Done — email delivered.")
+                return
+            print("  [WARN] Resend failed — falling back to Klaviyo event...")
+
+        print("\n[3/3] Sending event to Klaviyo (fallback / no RESEND_API_KEY)...")
         success = send_daily_report_event(data, insight)
 
         if success:
