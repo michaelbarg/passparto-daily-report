@@ -8,6 +8,8 @@ Returns structured data with 3 time periods per campaign/flow:
 import os, json, time, requests
 from datetime import datetime, timedelta, timezone
 
+from orders_collector import get_unfulfilled_orders
+
 KLAVIYO_KEY = os.environ.get("KLAVIYO_KEY", "")
 KLAVIYO_HEADERS = {
     'Authorization': f'Klaviyo-API-Key {KLAVIYO_KEY}',
@@ -313,6 +315,9 @@ def collect_all():
     print("  Fetching customer email metrics...")
     customer_emails = get_customer_email_metrics(time_windows)
 
+    print("  Fetching unfulfilled orders...")
+    unfulfilled_orders = get_unfulfilled_orders()
+
     summary = _build_summary(campaigns, flows)
 
     data = {
@@ -323,6 +328,8 @@ def collect_all():
         'campaigns': campaigns,
         'flows': flows,
         'customer_emails': customer_emails,
+        'unfulfilled_orders': unfulfilled_orders,
+        'unfulfilled_count': len(unfulfilled_orders),
         'summary': summary,
     }
 
@@ -330,4 +337,5 @@ def collect_all():
     print(f"  Yesterday: {s['emails_sent']} emails, {s['orders']} orders, ₪{s['revenue']}")
     s30 = summary['last_30_days']
     print(f"  30 days:   {s30['emails_sent']} emails, {s30['orders']} orders, ₪{s30['revenue']}")
+    print(f"  Unfulfilled orders open: {len(unfulfilled_orders)}")
     return data

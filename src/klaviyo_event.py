@@ -60,6 +60,10 @@ def send_daily_report_event(data, insight):
                     "shipping_mtd": ce.get('shipping', {}).get('month_to_date', 0),
                     "shipping_30d": ce.get('shipping', {}).get('last_30_days', 0),
 
+                    # Unfulfilled orders — array of dicts; rendered as a table in the template
+                    "unfulfilled_orders": data.get('unfulfilled_orders', []),
+                    "unfulfilled_count": data.get('unfulfilled_count', 0),
+
                     # AI insight
                     "insight": insight,
                     "report_time": datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M UTC')
