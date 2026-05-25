@@ -76,7 +76,7 @@ SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip()
 SHOPIFY_MIN_ORDER_NUMBER = int(os.environ.get("SHOPIFY_MIN_ORDER_NUMBER", "1776"))
 
 LOOKBACK_DAYS = int(os.environ.get("UNFULFILLED_LOOKBACK_DAYS", "14"))
-MAX_ORDERS_IN_EMAIL = int(os.environ.get("UNFULFILLED_MAX_IN_EMAIL", "50"))
+MAX_ORDERS_IN_EMAIL = int(os.environ.get("UNFULFILLED_MAX_IN_EMAIL", "100"))
 
 PLACED_ORDER_METRIC_ID = os.environ.get("KLAVIYO_PLACED_ORDER_METRIC_ID", "")
 FULFILLED_ORDER_METRIC_ID = os.environ.get("KLAVIYO_FULFILLED_ORDER_METRIC_ID", "")
@@ -445,13 +445,14 @@ def _from_shopify():
     # Operator-specified filters for "orders needing fulfillment":
     #   status=open                — not cancelled/archived
     #   fulfillment_status=unfulfilled  — strictly NOT shipped (excludes partial)
-    #   financial_status=paid      — fully paid (excludes authorized / partial)
+    #   financial_status=paid|authorized — customer has committed to pay,
+    #     whether captured or capture-on-fulfillment. Excludes refunded.
     # In Python we further drop ₪0 totals and orders below the operator's
     # cutover number (default #1776).
     params = {
         "status": "open",
         "fulfillment_status": "unfulfilled",
-        "financial_status": "paid",
+        "financial_status": "paid,authorized",
         "limit": 250,
         "fields": (
             "id,name,created_at,total_price,currency,fulfillment_status,"
@@ -462,7 +463,7 @@ def _from_shopify():
 
     print(f"    Shopify: GET {SHOPIFY_STORE_DOMAIN}/admin/.../orders.json "
           f"(status=open, fulfillment_status=unfulfilled, "
-          f"financial_status=paid, name>=#{SHOPIFY_MIN_ORDER_NUMBER}, total>0)")
+          f"financial_status=paid|authorized, name>=#{SHOPIFY_MIN_ORDER_NUMBER}, total>0)")
 
     orders = []
     url = base
