@@ -1,13 +1,15 @@
-"""Collect unfulfilled orders from Klaviyo events.
+"""Collect unfulfilled orders.
 
-Strategy:
-  1. Discover the metric IDs for "Placed Order" and "Fulfilled Order"
-     (auto-detected once per run; can be overridden via env).
-  2. Pull Placed Order events from the last LOOKBACK_DAYS days.
-  3. Pull Fulfilled Order events from the last LOOKBACK_DAYS + 7 days
-     (buffer for orders that were placed before the window but fulfilled in it).
-  4. Diff by OrderId (and order_number as fallback).
-  5. Return a clean list of dicts ready for the email template.
+Two sources, in priority order:
+
+  1. **Shopify Admin API** (preferred — live source of truth)
+     Used when SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_API_TOKEN are set.
+     Hits /admin/api/.../orders.json?fulfillment_status=unfulfilled,partial
+     so the daily email always reflects the *current* state of the store
+     at the moment the report runs.
+
+  2. **Klaviyo events** (fallback)
+     Diffs Placed Order vs Fulfilled Order events from the last 14 days.
 
 Output row shape (one per unfulfilled order):
 {
@@ -34,6 +36,10 @@ KLAVIYO_HEADERS = {
     "accept": "application/json",
     "content-type": "application/json",
 }
+
+SHOPIFY_STORE_DOMAIN = os.environ.get("SHOPIFY_STORE_DOMAIN", "").strip()
+SHOPIFY_ADMIN_API_TOKEN = os.environ.get("SHOPIFY_ADMIN_API_TOKEN", "").strip()
+SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2024-10").strip()
 
 LOOKBACK_DAYS = int(os.environ.get("UNFULFILLED_LOOKBACK_DAYS", "14"))
 MAX_ORDERS_IN_EMAIL = int(os.environ.get("UNFULFILLED_MAX_IN_EMAIL", "50"))
@@ -227,10 +233,176 @@ def _days_open(placed_iso, now):
     return max(0, (now - placed).days)
 
 
+# ─── Shopify Admin API source (preferred) ───────────────────
+
+def _shopify_format_address(addr):
+    """Build a one-line address string from Shopify shipping_address dict."""
+    if not isinstance(addr, dict):
+        return ""
+    parts = []
+    line1 = " ".join(filter(None, [addr.get("address1"), addr.get("address2")])).strip()
+    if line1:
+        parts.append(line1)
+    city_zip = " ".join(
+        filter(None, [addr.get("city"), str(addr.get("zip") or "").strip()])
+    ).strip()
+    if city_zip:
+        parts.append(city_zip)
+    country = addr.get("country") or addr.get("country_code")
+    if country and country not in ("IL", "Israel", "ישראל"):
+        parts.append(str(country))
+    return ", ".join(parts)
+
+
+def _shopify_items_summary(line_items, max_items=3):
+    """Compact 'qty x title' summary from Shopify line_items list."""
+    if not isinstance(line_items, list):
+        return ""
+    parts = []
+    for it in line_items[:max_items]:
+        title = it.get("title") or it.get("name") or ""
+        qty = it.get("quantity") or 1
+        if title:
+            parts.append(f"{qty}× {title}")
+    if len(line_items) > max_items:
+        parts.append(f"+{len(line_items) - max_items}")
+    return ", ".join(parts)
+
+
+def _from_shopify():
+    """Pull live unfulfilled orders straight from the Shopify Admin API."""
+    base = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}/orders.json"
+    headers = {
+        "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
+        "accept": "application/json",
+    }
+    params = {
+        "status": "any",
+        "fulfillment_status": "unfulfilled,partial",
+        "financial_status": "paid,partially_paid,authorized,partially_refunded",
+        "limit": 250,
+        "fields": (
+            "id,name,created_at,total_price,currency,fulfillment_status,"
+            "financial_status,cancelled_at,closed_at,customer,shipping_address,"
+            "billing_address,line_items,phone,note"
+        ),
+    }
+
+    print(f"    Shopify: GET {SHOPIFY_STORE_DOMAIN}/admin/.../orders.json"
+          f" (fulfillment_status=unfulfilled,partial)")
+
+    orders = []
+    url = base
+    pages = 0
+    while url and pages < 10:
+        for attempt in range(3):
+            r = requests.get(url, params=params if pages == 0 else None,
+                             headers=headers, timeout=30)
+            if r.status_code == 429:
+                wait = int(r.headers.get("Retry-After", "5"))
+                print(f"      [429] Shopify — waiting {wait}s...")
+                time.sleep(wait)
+                continue
+            break
+        if r.status_code != 200:
+            raise RuntimeError(f"Shopify {r.status_code}: {r.text[:200]}")
+
+        page_orders = r.json().get("orders", [])
+        orders.extend(page_orders)
+        pages += 1
+
+        link = r.headers.get("Link", "")
+        next_url = ""
+        for chunk in link.split(","):
+            if 'rel="next"' in chunk:
+                next_url = chunk.split(";")[0].strip().lstrip("<").rstrip(">")
+                break
+        url = next_url
+        time.sleep(0.3)
+
+    print(f"      {len(orders)} unfulfilled orders returned by Shopify")
+
+    now = datetime.now(timezone.utc)
+    rows = []
+    for o in orders:
+        if o.get("cancelled_at") or o.get("closed_at"):
+            continue
+
+        ship = o.get("shipping_address") or o.get("billing_address") or {}
+
+        first = (ship.get("first_name") if isinstance(ship, dict) else "") or ""
+        last = (ship.get("last_name") if isinstance(ship, dict) else "") or ""
+        customer_name = (f"{first} {last}").strip()
+        if not customer_name:
+            cust = o.get("customer") or {}
+            customer_name = (
+                f"{cust.get('first_name','') or ''} {cust.get('last_name','') or ''}"
+            ).strip() or cust.get("email", "—") or "—"
+
+        phone = ""
+        if isinstance(ship, dict):
+            phone = ship.get("phone") or ""
+        if not phone:
+            phone = o.get("phone") or (o.get("customer") or {}).get("phone") or ""
+
+        created_iso = o.get("created_at") or ""
+        try:
+            created_dt = datetime.fromisoformat(created_iso.replace("Z", "+00:00"))
+            placed_str = created_dt.astimezone(
+                timezone(timedelta(hours=3))
+            ).strftime("%d.%m.%Y")
+            days_open = max(0, (now - created_dt).days)
+        except Exception:
+            placed_str = ""
+            days_open = 0
+
+        try:
+            total_str = f"{float(o.get('total_price') or 0):.2f}"
+        except Exception:
+            total_str = str(o.get("total_price") or "0")
+
+        rows.append({
+            "order_number":  o.get("name") or f"#{o.get('id','')}",
+            "order_id":      str(o.get("id", "")),
+            "placed_at":     placed_str,
+            "days_open":     days_open,
+            "customer_name": customer_name,
+            "address":       _shopify_format_address(ship),
+            "phone":         phone,
+            "items_summary": _shopify_items_summary(o.get("line_items") or []),
+            "total":         total_str,
+        })
+
+        if len(rows) >= MAX_ORDERS_IN_EMAIL:
+            break
+
+    rows.sort(key=lambda r: r["days_open"], reverse=True)
+    return rows
+
+
 # ─── Main entry point ────────────────────────────────────────
 
 def get_unfulfilled_orders():
-    """Return a list of unfulfilled orders, newest first."""
+    """Return a list of unfulfilled orders, newest first.
+
+    Prefers Shopify Admin API (live state). Falls back to Klaviyo events
+    if Shopify isn't configured or the call fails.
+    """
+    if SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_API_TOKEN:
+        try:
+            print("    Source: Shopify Admin API (live store data)")
+            rows = _from_shopify()
+            print(f"    => {len(rows)} unfulfilled orders (Shopify)")
+            return rows
+        except Exception as e:
+            print(f"    [WARN] Shopify lookup failed ({e}) — falling back to Klaviyo")
+
+    print("    Source: Klaviyo events (Placed Order minus Fulfilled Order)")
+    return _from_klaviyo()
+
+
+def _from_klaviyo():
+    """Diff Klaviyo Placed Order vs Fulfilled Order events."""
     placed_id, fulfilled_id = _ensure_metric_ids()
     if not placed_id:
         print("  [WARN] 'Placed Order' metric not found — skipping unfulfilled orders")
@@ -323,5 +495,5 @@ def get_unfulfilled_orders():
             break
 
     rows.sort(key=lambda r: r["days_open"], reverse=True)
-    print(f"    => {len(rows)} unfulfilled orders")
+    print(f"    => {len(rows)} unfulfilled orders (Klaviyo)")
     return rows
