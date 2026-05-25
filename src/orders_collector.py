@@ -37,11 +37,26 @@ KLAVIYO_HEADERS = {
     "content-type": "application/json",
 }
 
-SHOPIFY_STORE_DOMAIN = (
+def _normalize_shopify_domain(raw):
+    """Accept any of: bare subdomain, full *.myshopify.com, or full https URL."""
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    s = s.replace("https://", "").replace("http://", "")
+    s = s.rstrip("/")
+    if "/" in s:
+        s = s.split("/", 1)[0]
+    if "." not in s:
+        s = f"{s}.myshopify.com"
+    return s
+
+
+SHOPIFY_STORE_DOMAIN = _normalize_shopify_domain(
     os.environ.get("SHOPIFY_STORE_DOMAIN")
+    or os.environ.get("SHOPIFY_STORE_URL")
     or os.environ.get("SHOPIFY_DOMAIN")
-    or "passparto.myshopify.com"
-).strip()
+    or ""
+)
 
 SHOPIFY_ADMIN_API_TOKEN = (
     os.environ.get("SHOPIFY_ADMIN_API_TOKEN")
