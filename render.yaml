@@ -2,7 +2,7 @@ services:
   - type: cron
     name: passparto-daily-report
     env: python
-    schedule: "0 5 * * *"  # 08:00 Israel (UTC+3)
+    schedule: "0 3 * * *"  # 06:00 Israel during DST (UTC+3); 05:00 in winter (UTC+2)
     buildCommand: pip install -r requirements.txt
     startCommand: cd src && python main.py
     envVars:
@@ -11,4 +11,8 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: MICHAEL_EMAIL
+        sync: false
+      - key: SHOPIFY_STORE_DOMAIN
+        sync: false
+      - key: SHOPIFY_ADMIN_API_TOKEN
         sync: false
