@@ -10,12 +10,12 @@
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f0ede8;padding:24px 0;">
   <tr>
     <td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+      <table width="640" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
 
         <!-- HEADER WITH LOGO -->
         <tr>
           <td align="center" style="background:#ffffff;padding:24px 32px;border-bottom:1px solid #eeeeee;">
-            <img src="https://www.passparto.co.il/cdn/shop/files/logo_small_5a04aa89-6b41-4c92-bed8-093d9610229f.svg?v=1737024230" 
+            <img src="https://www.passparto.co.il/cdn/shop/files/logo_small_5a04aa89-6b41-4c92-bed8-093d9610229f.svg?v=1737024230"
                  height="40" alt="פספרטו" style="display:block;">
           </td>
         </tr>
@@ -31,13 +31,92 @@
           </td>
         </tr>
 
+        <!-- ════════════════════════════════════════════ -->
+        <!-- SECTION 0: UNFULFILLED ORDERS — THE ACTION LIST -->
+        <!-- ════════════════════════════════════════════ -->
+        <tr>
+          <td style="padding:30px 32px 8px;">
+            <p style="margin:0 0 14px;font-size:13px;color:#1a1a1a;letter-spacing:2px;font-weight:600;border-bottom:2px solid #C62828;padding-bottom:8px;">
+              📦 הזמנות לטיפול ({{ event.unfulfilled_count|default:0 }})
+            </p>
+
+            {% if event.unfulfilled_orders %}
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border-collapse:collapse;font-size:12px;margin-top:6px;border:1px solid #e8e1d4;">
+              <thead>
+                <tr style="background:#1a1a1a;color:#ffffff;">
+                  <th width="36"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">✓</th>
+                  <th width="80"  align="right"  style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">הזמנה</th>
+                  <th width="78"  align="right"  style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">תאריך</th>
+                  <th width="40"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">ימים</th>
+                  <th               align="right" style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">לקוח</th>
+                  <th               align="right" style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">כתובת למשלוח</th>
+                  <th width="100" align="right"  style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">טלפון</th>
+                  <th width="70"  align="left"   style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;">סכום</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for o in event.unfulfilled_orders %}
+                <tr style="background:{% if forloop.counter|divisibleby:2 %}#faf8f4{% else %}#ffffff{% endif %};">
+                  <td align="center" style="padding:10px 6px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;">
+                    <span style="display:inline-block;width:16px;height:16px;border:1.5px solid {% if o.days_open >= 3 %}#C62828{% else %}#888{% endif %};border-radius:3px;"></span>
+                  </td>
+                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;direction:ltr;text-align:right;">
+                    <strong style="color:#1a1a1a;">{{ o.order_number }}</strong>
+                  </td>
+                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#555;">
+                    {{ o.placed_at }}
+                  </td>
+                  <td align="center" style="padding:10px 6px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;">
+                    <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-weight:600;font-size:11px;
+                                 background:{% if o.days_open >= 3 %}#FFEBEE{% elif o.days_open >= 1 %}#FFF8E1{% else %}#E8F5E9{% endif %};
+                                 color:{% if o.days_open >= 3 %}#C62828{% elif o.days_open >= 1 %}#F57C00{% else %}#2E7D32{% endif %};">
+                      {{ o.days_open }}
+                    </span>
+                  </td>
+                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#1a1a1a;">
+                    {{ o.customer_name }}
+                  </td>
+                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#333;line-height:1.4;">
+                    {{ o.address }}
+                    {% if o.items_summary %}
+                    <div style="font-size:11px;color:#888;margin-top:3px;">{{ o.items_summary }}</div>
+                    {% endif %}
+                  </td>
+                  <td align="right" style="padding:10px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#555;direction:ltr;text-align:right;font-size:11px;">
+                    {{ o.phone }}
+                  </td>
+                  <td align="left" style="padding:10px 8px;border-bottom:1px solid #eee5d6;color:#1a1a1a;font-weight:600;direction:ltr;">
+                    ₪{{ o.total }}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <p style="margin:8px 0 0;font-size:11px;color:#888;text-align:right;">
+              ▢ סמן ✓ אחרי שההזמנה טופלה. שורות באדום = פתוחות 3+ ימים.
+            </p>
+            {% else %}
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background:#E8F5E9;border-right:4px solid #2E7D32;padding:18px 22px;border-radius:4px;text-align:center;">
+                  <p style="margin:0;font-size:14px;color:#1B5E20;font-weight:600;">
+                    ✅ אין הזמנות פתוחות לטיפול. עבודה טובה!
+                  </p>
+                </td>
+              </tr>
+            </table>
+            {% endif %}
+          </td>
+        </tr>
+
         <!-- SECTION 1: AUDIENCE OVERVIEW -->
         <tr>
-          <td style="padding:30px 40px 8px;">
+          <td style="padding:24px 40px 8px;">
             <p style="margin:0 0 14px;font-size:13px;color:#1a1a1a;letter-spacing:2px;font-weight:600;border-bottom:2px solid #c9a96e;padding-bottom:8px;">
               👥 בסיס הלקוחות
             </p>
-            
+
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td style="background:#f9f7f4;border-right:4px solid #2E7D32;padding:14px 18px;border-radius:4px;">
@@ -46,12 +125,12 @@
                 </td>
               </tr>
             </table>
-            
+
             <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
               <tr>
                 <td width="48%" style="background:#f9f7f4;border-right:4px solid #1565C0;padding:12px 16px;border-radius:4px;vertical-align:top;">
-                  <p style="margin:0 0 2px;font-size:11px;color:#666;">Active</p>
-                  <p style="margin:0;font-size:22px;line-height:1;color:#1565C0;font-weight:600;">{{ event.active_subscribers }}</p>
+                  <p style="margin:0 0 2px;font-size:11px;color:#666;">סה"כ פרופילים</p>
+                  <p style="margin:0;font-size:22px;line-height:1;color:#1565C0;font-weight:600;">{{ event.total_profiles }}</p>
                 </td>
                 <td width="4%"></td>
                 <td width="48%" style="background:#f9f7f4;border-right:4px solid #c9a96e;padding:12px 16px;border-radius:4px;vertical-align:top;">
@@ -81,7 +160,7 @@
             <p style="margin:0 0 14px;font-size:13px;color:#1a1a1a;letter-spacing:2px;font-weight:600;border-bottom:2px solid #c9a96e;padding-bottom:8px;">
               💰 סיכום הכנסות מאתמול
             </p>
-            
+
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr>
                 <td style="background:#fff8e1;border-right:4px solid #c9a96e;padding:18px 22px;border-radius:4px;">
@@ -101,7 +180,7 @@
                 </td>
               </tr>
             </table>
-            
+
             <p style="margin:8px 0 0;font-size:11px;color:#999;text-align:center;">
               📧 סה"כ {{ event.total_emails_sent }} מיילים יצאו אתמול ({{ event.campaigns_count }} קמפיינים + Flows)
             </p>
@@ -114,7 +193,35 @@
             <p style="margin:0 0 14px;font-size:13px;color:#1a1a1a;letter-spacing:2px;font-weight:600;border-bottom:2px solid #1565C0;padding-bottom:8px;">
               🎯 קמפיינים אתמול
             </p>
-            {{ event.campaigns_html }}
+
+            {% if event.campaigns %}
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:12px;border:1px solid #e0e0e0;">
+              <thead>
+                <tr style="background:#1565C0;color:#ffffff;">
+                  <th align="right" style="padding:8px 10px;font-size:11px;border-left:1px solid #0D47A1;">קמפיין</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;border-left:1px solid #0D47A1;">נשלח</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;border-left:1px solid #0D47A1;">פתיחה %</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;border-left:1px solid #0D47A1;">קליק %</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;border-left:1px solid #0D47A1;">רכישות</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;">הכנסה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in event.campaigns %}
+                <tr style="background:{% if forloop.counter|divisibleby:2 %}#f7fbff{% else %}#ffffff{% endif %};">
+                  <td align="right"  style="padding:8px 10px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;color:#1a1a1a;">{{ c.name }}</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ c.yesterday.sent }}</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ c.yesterday.open_rate }}%</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ c.yesterday.click_rate }}%</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;font-weight:600;">{{ c.yesterday.orders }}</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;font-weight:600;direction:ltr;">₪{{ c.yesterday.revenue }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p style="margin:0;font-size:12px;color:#999;font-style:italic;">לא יצאו קמפיינים אתמול.</p>
+            {% endif %}
           </td>
         </tr>
 
@@ -124,7 +231,33 @@
             <p style="margin:0 0 14px;font-size:13px;color:#1a1a1a;letter-spacing:2px;font-weight:600;border-bottom:2px solid #2E7D32;padding-bottom:8px;">
               🔄 Flows אקטיביים
             </p>
-            {{ event.flows_html }}
+
+            {% if event.flows %}
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:12px;border:1px solid #e0e0e0;">
+              <thead>
+                <tr style="background:#2E7D32;color:#ffffff;">
+                  <th align="right" style="padding:8px 10px;font-size:11px;border-left:1px solid #1B5E20;">Flow</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;border-left:1px solid #1B5E20;">נשלח</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;border-left:1px solid #1B5E20;">פתיחה %</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;border-left:1px solid #1B5E20;">רכישות</th>
+                  <th align="center" style="padding:8px 8px;font-size:11px;">הכנסה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for f in event.flows %}
+                <tr style="background:{% if forloop.counter|divisibleby:2 %}#f4faf4{% else %}#ffffff{% endif %};">
+                  <td align="right"  style="padding:8px 10px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;color:#1a1a1a;">{{ f.name }}</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ f.yesterday.sent }}</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;">{{ f.yesterday.open_rate }}%</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;border-left:1px solid #ececec;font-weight:600;">{{ f.yesterday.orders }}</td>
+                  <td align="center" style="padding:8px 8px;border-bottom:1px solid #ececec;font-weight:600;direction:ltr;">₪{{ f.yesterday.revenue }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p style="margin:0;font-size:12px;color:#999;font-style:italic;">אין פעילות Flows אתמול.</p>
+            {% endif %}
           </td>
         </tr>
 
@@ -154,7 +287,7 @@
         <!-- FOOTER -->
         <tr>
           <td align="center" style="background:#ffffff;padding:20px 24px;">
-            <img src="https://www.passparto.co.il/cdn/shop/files/logo_small_5a04aa89-6b41-4c92-bed8-093d9610229f.svg?v=1737024230" 
+            <img src="https://www.passparto.co.il/cdn/shop/files/logo_small_5a04aa89-6b41-4c92-bed8-093d9610229f.svg?v=1737024230"
                  height="22" alt="פספרטו" style="display:block;margin:0 auto 10px;">
             <p style="margin:0 0 4px;font-size:11px;color:#999;">דוח אוטומטי · נשלח כל יום ב-08:00</p>
             <p style="margin:0;font-size:10px;color:#bbb;">passparto.co.il</p>
