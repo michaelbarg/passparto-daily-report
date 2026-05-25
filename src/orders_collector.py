@@ -67,6 +67,14 @@ SHOPIFY_ADMIN_API_TOKEN = (
 
 SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2024-10").strip()
 
+SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "").strip()
+SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "").strip()
+
+# How far back to look when fetching unfulfilled orders from Shopify.
+# Default 30 days: covers normal shipping delays without dragging in
+# hundreds of stale legacy orders. Set to 0 to disable the date filter.
+SHOPIFY_LOOKBACK_DAYS = int(os.environ.get("SHOPIFY_LOOKBACK_DAYS", "30"))
+
 LOOKBACK_DAYS = int(os.environ.get("UNFULFILLED_LOOKBACK_DAYS", "14"))
 MAX_ORDERS_IN_EMAIL = int(os.environ.get("UNFULFILLED_MAX_IN_EMAIL", "50"))
 
@@ -386,11 +394,52 @@ def _short_order_number(name, order_id):
     return digits
 
 
+def _get_shopify_access_token():
+    """Return a working Shopify Admin API access token.
+
+    Order of preference:
+      1. CLIENT_ID + CLIENT_SECRET via OAuth client_credentials grant
+         (issues a fresh shpat_ token each run, ~1 sec). Preferred
+         because the static token in the env-group is stale.
+      2. Static SHOPIFY_ADMIN_API_TOKEN if it looks valid (shpat_*).
+      3. Empty string — caller falls back to Klaviyo events.
+    """
+    if SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET and SHOPIFY_STORE_DOMAIN:
+        try:
+            r = requests.post(
+                f"https://{SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token",
+                data={
+                    "client_id": SHOPIFY_CLIENT_ID,
+                    "client_secret": SHOPIFY_CLIENT_SECRET,
+                    "grant_type": "client_credentials",
+                },
+                timeout=15,
+            )
+            if r.status_code == 200:
+                tok = r.json().get("access_token", "")
+                if tok:
+                    return tok
+            print(f"      [WARN] OAuth exchange failed {r.status_code}: {r.text[:160]}")
+        except Exception as e:
+            print(f"      [WARN] OAuth exchange error: {e}")
+
+    if SHOPIFY_ADMIN_API_TOKEN and SHOPIFY_ADMIN_API_TOKEN.startswith("shpat_"):
+        return SHOPIFY_ADMIN_API_TOKEN
+    return ""
+
+
 def _from_shopify():
     """Pull live unfulfilled orders straight from the Shopify Admin API."""
+    token = _get_shopify_access_token()
+    if not token:
+        raise RuntimeError(
+            "Shopify auth unavailable — set SHOPIFY_CLIENT_ID + "
+            "SHOPIFY_CLIENT_SECRET or a static SHOPIFY_ADMIN_API_TOKEN"
+        )
+
     base = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}/orders.json"
     headers = {
-        "X-Shopify-Access-Token": SHOPIFY_ADMIN_API_TOKEN,
+        "X-Shopify-Access-Token": token,
         "accept": "application/json",
     }
     params = {
@@ -404,9 +453,12 @@ def _from_shopify():
             "billing_address,line_items,phone,note"
         ),
     }
+    if SHOPIFY_LOOKBACK_DAYS > 0:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=SHOPIFY_LOOKBACK_DAYS)
+        params["created_at_min"] = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     print(f"    Shopify: GET {SHOPIFY_STORE_DOMAIN}/admin/.../orders.json"
-          f" (fulfillment_status=unfulfilled,partial)")
+          f" (fulfillment_status=unfulfilled,partial, last {SHOPIFY_LOOKBACK_DAYS} days)")
 
     orders = []
     url = base
@@ -511,18 +563,23 @@ def _from_shopify():
 def get_unfulfilled_orders():
     """Return a list of unfulfilled orders, newest first.
 
-    Prefers Shopify Admin API (live state). Falls back to Klaviyo events
-    if Shopify isn't configured or the call fails.
+    Prefers Shopify Admin API live state. Auth via either:
+      * SHOPIFY_CLIENT_ID + SHOPIFY_CLIENT_SECRET (OAuth client_credentials,
+        produces a fresh shpat_ token each run), OR
+      * static SHOPIFY_ADMIN_API_TOKEN (shpat_*).
 
-    Token env vars accepted (first non-empty wins):
-        SHOPIFY_ADMIN_API_TOKEN, SHOPIFY_ADMIN_TOKEN, SHOPIFY_TOKEN
-    Domain env vars accepted:
-        SHOPIFY_STORE_DOMAIN, SHOPIFY_DOMAIN
-        (defaults to passparto.myshopify.com if neither is set)
+    Falls back to Klaviyo events if neither path is configured or the
+    Shopify call fails for any reason.
     """
-    if SHOPIFY_ADMIN_API_TOKEN and SHOPIFY_STORE_DOMAIN:
+    has_oauth = bool(SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET)
+    has_static = bool(
+        SHOPIFY_ADMIN_API_TOKEN and SHOPIFY_ADMIN_API_TOKEN.startswith("shpat_")
+    )
+    if SHOPIFY_STORE_DOMAIN and (has_oauth or has_static):
+        auth_method = "OAuth client_credentials" if has_oauth else "static shpat_ token"
         try:
-            print(f"    Source: Shopify Admin API (live data from {SHOPIFY_STORE_DOMAIN})")
+            print(f"    Source: Shopify Admin API (live data from "
+                  f"{SHOPIFY_STORE_DOMAIN}, auth via {auth_method})")
             rows = _from_shopify()
             print(f"    => {len(rows)} unfulfilled orders (Shopify)")
             return rows
@@ -530,10 +587,10 @@ def get_unfulfilled_orders():
             print(f"    [WARN] Shopify lookup failed ({e}) — falling back to Klaviyo")
     else:
         missing = []
-        if not SHOPIFY_ADMIN_API_TOKEN:
-            missing.append("SHOPIFY_ADMIN_API_TOKEN/SHOPIFY_ADMIN_TOKEN")
         if not SHOPIFY_STORE_DOMAIN:
-            missing.append("SHOPIFY_STORE_DOMAIN")
+            missing.append("SHOPIFY_STORE_DOMAIN/SHOPIFY_STORE_URL")
+        if not (has_oauth or has_static):
+            missing.append("SHOPIFY_CLIENT_ID+SHOPIFY_CLIENT_SECRET or shpat_ token")
         print(f"    Shopify not configured (missing: {', '.join(missing)}) — using Klaviyo fallback")
 
     print("    Source: Klaviyo events (Placed Order minus Fulfilled Order)")
