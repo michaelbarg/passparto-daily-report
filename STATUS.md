@@ -1,9 +1,24 @@
 # Passparto Daily Report — Status
 
-> מסמך חי. מתעדכן אחרי כל שינוי משמעותי. לסטטוס בזמן-אמת על Render (ריצה אחרונה, env vars, deploy פעיל) הריצו:
+> 🔒 **נעול ופעיל** מ-25.05.2026 15:51 IL. מייל יומי אוטומטי דרך Resend, נתונים חיים מ-Shopify, מחר ב-06:00 IL הריצה הבאה.
+>
+> מסמך חי. מתעדכן אחרי כל שינוי משמעותי. לסטטוס בזמן-אמת על Render הריצו:
 > ```
 > RENDER_API_KEY=... python3 scripts/status.py
 > ```
+
+## הגדרות נעולות
+
+| אספקט | ערך |
+|---|---|
+| **תזמון** | `0 3 * * *` UTC = **06:00 IL** (DST). בחורף 05:00 IL. |
+| **ערוץ שליחה** | Resend ישיר מ-`reports@passparto.com` (Klaviyo Flow כ-fallback בלבד) |
+| **מקור הזמנות** | Shopify Admin API live, אימות OAuth `client_credentials` (טוקן `shpat_` חי כל ריצה) |
+| **קריטריון הזמנה לטיפול** | `status=open` + `fulfillment_status=unfulfilled` + `financial_status=paid\|authorized` + `name >= #1776` + `total > 0` |
+| **חתך מספר התחלה** | `#1776` (שינוי דרך `SHOPIFY_MIN_ORDER_NUMBER` env) |
+| **מקסימום הזמנות במייל** | 100 (כרגע ~54 בפועל) |
+| **עמודות בטבלה** | `# \| מוצר \| מידה \| צבע \| כמות \| הזמנה` (קישור לעמוד ההזמנה ב-Shopify admin) |
+| **Badge בראש** | `🆕 N חדשות מאתמול` (לפי `created_at` ב-24h אחרונות) |
 
 ## עכשיו
 
@@ -61,3 +76,8 @@ RENDER_API_KEY=...   RENDER_SERVICE_ID=crn-d7ovvo0g4nts7387q580   python3 script
 - **25.05.2026 10:32 UTC** — מסלול שליחה ישיר דרך Resend, Jinja2 instead of Klaviyo Flow (PR #4).
 - **25.05.2026 10:51 UTC** — תיקון from-domain: `reports@passparto.com` (לא `support@passparto.co.il`, שלא מאומת ב-Resend) (PR #5).
 - **25.05.2026 11:05 UTC** — ריצה אומתה: מייל נמסר דרך Resend (`a2e49a91-c650-4b19-ae7d-c17ea7c22b36`), Klaviyo לא הופעל. **המסלול הראשי כעת עובד end-to-end.**
+- **25.05.2026 11:38 UTC** — מבנה טבלה חדש (PR #7): שורה לכל line item, 5 עמודות, מספרי הזמנה כקישורים ל-Shopify admin, badge `🆕 חדשות מאתמול`. נמסר עם ה-id `eb6353bc...`.
+- **25.05.2026 11:43 UTC** — הוספת עמודת צבע (PR #8): פיצול `variant_title` ל-מידה+צבע. נמסר עם ה-id `de0e2d50...`.
+- **25.05.2026 12:11 UTC** — אימות Shopify live (PR #9): `client_credentials` OAuth → `shpat_` חי. גילוי שהיו 1154 הזמנות לא-שלמות בכלל הזמנים, רובן legacy.
+- **25.05.2026 12:39 UTC** — סינון מדויק (PR #10 + #11): `status=open` + `unfulfilled` + `paid|authorized` + `name>=#1776` → 54 הזמנות אמיתיות. בוטל הסינון לפי 30 יום.
+- **25.05.2026 12:51 UTC** — ריצה אומתה סופית (`52fb7edd-a883-4384-9241-b4461fde820c`): 54 הזמנות מ-#1776 עד #2155, נמסר ב-15:51 IL. **🔒 נעול.**
