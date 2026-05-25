@@ -37,8 +37,19 @@ KLAVIYO_HEADERS = {
     "content-type": "application/json",
 }
 
-SHOPIFY_STORE_DOMAIN = os.environ.get("SHOPIFY_STORE_DOMAIN", "").strip()
-SHOPIFY_ADMIN_API_TOKEN = os.environ.get("SHOPIFY_ADMIN_API_TOKEN", "").strip()
+SHOPIFY_STORE_DOMAIN = (
+    os.environ.get("SHOPIFY_STORE_DOMAIN")
+    or os.environ.get("SHOPIFY_DOMAIN")
+    or "passparto.myshopify.com"
+).strip()
+
+SHOPIFY_ADMIN_API_TOKEN = (
+    os.environ.get("SHOPIFY_ADMIN_API_TOKEN")
+    or os.environ.get("SHOPIFY_ADMIN_TOKEN")
+    or os.environ.get("SHOPIFY_TOKEN")
+    or ""
+).strip()
+
 SHOPIFY_API_VERSION = os.environ.get("SHOPIFY_API_VERSION", "2024-10").strip()
 
 LOOKBACK_DAYS = int(os.environ.get("UNFULFILLED_LOOKBACK_DAYS", "14"))
@@ -387,15 +398,28 @@ def get_unfulfilled_orders():
 
     Prefers Shopify Admin API (live state). Falls back to Klaviyo events
     if Shopify isn't configured or the call fails.
+
+    Token env vars accepted (first non-empty wins):
+        SHOPIFY_ADMIN_API_TOKEN, SHOPIFY_ADMIN_TOKEN, SHOPIFY_TOKEN
+    Domain env vars accepted:
+        SHOPIFY_STORE_DOMAIN, SHOPIFY_DOMAIN
+        (defaults to passparto.myshopify.com if neither is set)
     """
-    if SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_API_TOKEN:
+    if SHOPIFY_ADMIN_API_TOKEN and SHOPIFY_STORE_DOMAIN:
         try:
-            print("    Source: Shopify Admin API (live store data)")
+            print(f"    Source: Shopify Admin API (live data from {SHOPIFY_STORE_DOMAIN})")
             rows = _from_shopify()
             print(f"    => {len(rows)} unfulfilled orders (Shopify)")
             return rows
         except Exception as e:
             print(f"    [WARN] Shopify lookup failed ({e}) — falling back to Klaviyo")
+    else:
+        missing = []
+        if not SHOPIFY_ADMIN_API_TOKEN:
+            missing.append("SHOPIFY_ADMIN_API_TOKEN/SHOPIFY_ADMIN_TOKEN")
+        if not SHOPIFY_STORE_DOMAIN:
+            missing.append("SHOPIFY_STORE_DOMAIN")
+        print(f"    Shopify not configured (missing: {', '.join(missing)}) — using Klaviyo fallback")
 
     print("    Source: Klaviyo events (Placed Order minus Fulfilled Order)")
     return _from_klaviyo()
