@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>פספרטו · דף ליקוט יומי</title>
+<style>
+  :root {
+    --gold: #c9a96e;
+    --black: #1a1a1a;
+    --bg:    #f0ede8;
+    --row-alt: #faf8f4;
+    --new: #2E7D32;
+    --new-bg: #E8F5E9;
+    --ca-bg: #E3F2FD;
+    --ca-fg: #0D47A1;
+    --other-bg: #FFF3E0;
+    --other-fg: #BF360C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0; background: var(--bg);
+    font-family: 'Helvetica Neue', Arial, sans-serif; direction: rtl;
+    color: #222;
+  }
+  .wrap { max-width: 1100px; margin: 24px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.06); overflow: hidden; }
+  header { background: var(--black); color: #fff; padding: 22px 28px; }
+  header h1 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: 1px; color: #fff; }
+  header .meta { color: var(--gold); font-size: 12px; margin-top: 6px; letter-spacing: 2px; }
+
+  .controls {
+    position: sticky; top: 0; z-index: 5;
+    background: #fff; padding: 14px 28px; border-bottom: 1px solid #eee;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .controls > * { font-size: 13px; }
+  .btn {
+    appearance: none; border: 1px solid #d6d2c7; background: #fff;
+    padding: 8px 14px; border-radius: 6px; cursor: pointer;
+    font-family: inherit; color: var(--black);
+  }
+  .btn:hover { background: var(--row-alt); }
+  .btn.primary { background: var(--black); color: #fff; border-color: var(--black); }
+  .btn.primary:hover { background: #333; }
+  .btn .count { display: inline-block; min-width: 18px; padding: 0 6px; margin-inline-start: 6px; background: rgba(255,255,255,.2); border-radius: 9px; font-weight: 600; }
+
+  .filters { display: inline-flex; gap: 4px; align-items: center; margin-inline-start: 10px; flex-wrap: wrap; }
+  .filters span.label { color: #888; font-size: 11px; }
+  .chip {
+    border: 1px solid #d6d2c7; padding: 4px 10px; border-radius: 14px; cursor: pointer;
+    background: #fff; color: #555; font-size: 12px;
+  }
+  .chip.active { background: var(--black); color: #fff; border-color: var(--black); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 60px; background: var(--black); color: #fff;
+    padding: 10px 8px; font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    border-left: 1px solid #333; text-align: right;
+  }
+  thead th:first-child { text-align: center; }
+  thead th.col-pick { width: 40px; }
+  thead th.col-num  { width: 36px; text-align: center; }
+  thead th.col-sup  { width: 110px; }
+  thead th.col-size { width: 100px; }
+  thead th.col-col  { width: 80px; }
+  thead th.col-qty  { width: 50px; text-align: center; }
+  thead th.col-ord  { width: 90px; text-align: left; }
+
+  tbody td { padding: 9px 10px; border-bottom: 1px solid #eee5d6; vertical-align: middle; }
+  tbody td.center { text-align: center; }
+  tbody td.left   { text-align: left; direction: ltr; }
+  tbody tr.zebra td { background: var(--row-alt); }
+  tbody tr.order-divider td { padding: 4px 10px; font-size: 11px; color: #888; background: #f3ebda; border-bottom: 2px solid #c9a96e; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 11px; }
+  .badge-ca    { background: var(--ca-bg);    color: var(--ca-fg); }
+  .badge-other { background: var(--other-bg); color: var(--other-fg); }
+  .badge-new   { background: var(--new-bg);   color: var(--new); margin-inline-start: 6px; }
+
+  .order-link { color: #1565C0; font-weight: 600; text-decoration: none; }
+  .order-link:hover { text-decoration: underline; }
+
+  input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+
+  .empty {
+    text-align: center; padding: 40px; color: #2E7D32; font-size: 16px;
+    background: var(--new-bg); border-right: 4px solid var(--new); margin: 24px;
+    border-radius: 6px;
+  }
+
+  /* Print: hide unchecked rows + chrome, A4-ish layout */
+  @media print {
+    body { background: #fff; }
+    .wrap { box-shadow: none; max-width: none; margin: 0; border-radius: 0; }
+    header { padding: 12px 16px; }
+    .controls, .filters { display: none !important; }
+    thead th { position: static; }
+    body.printing tbody tr.row:not(.checked) { display: none; }
+    body.printing tbody tr.order-divider.empty-after { display: none; }
+    body.printing tbody tr td.left { direction: ltr; }
+    @page { size: A4; margin: 14mm; }
+    /* When grouping, push each order to a new page */
+    body.printing.group-pages tbody tr.order-divider { page-break-before: always; }
+    body.printing.group-pages tbody tr.order-divider:first-of-type { page-break-before: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <h1>📦 פספרטו · דף ליקוט יומי</h1>
+    <div class="meta">{{ generated_at }} IL · {{ order_count }} הזמנות · {{ line_item_count }} פריטים</div>
+  </header>
+
+  {% if items %}
+
+  <div class="controls">
+    <button id="btn-print" class="btn primary">
+      🖨 הדפס נבחרים<span id="count" class="count">0</span>
+    </button>
+    <button id="btn-all"   class="btn">✅ בחר הכול</button>
+    <button id="btn-none"  class="btn">🚫 נקה</button>
+    <label class="btn" title="כל הזמנה תודפס בעמוד נפרד">
+      <input type="checkbox" id="group-pages" style="margin-inline-end:6px;vertical-align:-3px;width:14px;height:14px;">
+      קבץ הזמנות לעמודים נפרדים
+    </label>
+
+    <span class="filters">
+      <span class="label">סנן ספק:</span>
+      <span class="chip active" data-supplier="*">הכול</span>
+      {% for sup in suppliers %}
+      <span class="chip" data-supplier="{{ sup }}">{{ sup }}</span>
+      {% endfor %}
+    </span>
+  </div>
+
+  <table id="grid">
+    <thead>
+      <tr>
+        <th class="col-pick"><input type="checkbox" id="head-pick"></th>
+        <th class="col-num">#</th>
+        <th>מוצר</th>
+        <th class="col-sup">ספק</th>
+        <th class="col-size">מידה</th>
+        <th class="col-col">צבע</th>
+        <th class="col-qty">כמות</th>
+        <th class="col-ord">הזמנה</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% set ns = namespace(prev_order=None, idx=0) %}
+      {% for item in items %}
+        {% if item.order_number_short != ns.prev_order %}
+          <tr class="order-divider" data-order="{{ item.order_number_short }}">
+            <td colspan="8">
+              הזמנה
+              {% if item.order_admin_url %}
+              <a class="order-link" href="{{ item.order_admin_url }}" target="_blank">#{{ item.order_number_short }}</a>
+              {% else %}
+              <strong>#{{ item.order_number_short }}</strong>
+              {% endif %}
+              {% if item.is_new_today %}<span class="badge badge-new">🆕 חדשה</span>{% endif %}
+            </td>
+          </tr>
+          {% set ns.prev_order = item.order_number_short %}
+        {% endif %}
+        {% set ns.idx = ns.idx + 1 %}
+        <tr class="row {% if ns.idx % 2 == 0 %}zebra{% endif %}"
+            data-supplier="{{ item.supplier }}"
+            data-order="{{ item.order_number_short }}">
+          <td class="center"><input type="checkbox" class="row-pick"></td>
+          <td class="center">{{ ns.idx }}</td>
+          <td>{{ item.product }}</td>
+          <td>
+            {% if item.supplier == 'Cotton Avenue' %}
+              <span class="badge badge-ca">Cotton Avenue</span>
+            {% elif item.supplier %}
+              <span class="badge badge-other">{{ item.supplier }}</span>
+            {% endif %}
+          </td>
+          <td>{{ item.size }}</td>
+          <td>{{ item.color }}</td>
+          <td class="center"><strong>{{ item.quantity }}</strong></td>
+          <td class="left">
+            {% if item.order_admin_url %}
+            <a class="order-link" href="{{ item.order_admin_url }}" target="_blank">#{{ item.order_number_short }}</a>
+            {% else %}
+            <strong>#{{ item.order_number_short }}</strong>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% else %}
+  <div class="empty">
+    ✅ אין הזמנות פתוחות לטיפול. עבודה טובה!
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+(function () {
+  const $$ = (s, c) => Array.from((c || document).querySelectorAll(s));
+  const $  = (s, c) => (c || document).querySelector(s);
+  if (!$('#grid')) return;
+
+  const rows         = $$('tbody tr.row');
+  const dividers     = $$('tbody tr.order-divider');
+  const headPick     = $('#head-pick');
+  const btnAll       = $('#btn-all');
+  const btnNone      = $('#btn-none');
+  const btnPrint     = $('#btn-print');
+  const countLabel   = $('#count');
+  const groupPagesCb = $('#group-pages');
+  const chips        = $$('.chip');
+
+  function visibleRows() {
+    return rows.filter(r => r.style.display !== 'none');
+  }
+
+  function updateCount() {
+    const n = visibleRows().filter(r => r.querySelector('.row-pick').checked).length;
+    countLabel.textContent = n;
+    btnPrint.disabled = (n === 0);
+    rows.forEach(r => r.classList.toggle('checked', r.querySelector('.row-pick').checked));
+    // hide empty order-dividers (when all rows of an order got hidden by filter)
+    dividers.forEach(d => {
+      const ord = d.dataset.order;
+      const any = rows.some(r => r.dataset.order === ord && r.style.display !== 'none');
+      d.style.display = any ? '' : 'none';
+    });
+  }
+
+  rows.forEach(r => r.querySelector('.row-pick').addEventListener('change', updateCount));
+
+  headPick.addEventListener('change', () => {
+    visibleRows().forEach(r => { r.querySelector('.row-pick').checked = headPick.checked; });
+    updateCount();
+  });
+
+  btnAll.addEventListener('click', () => {
+    visibleRows().forEach(r => { r.querySelector('.row-pick').checked = true; });
+    headPick.checked = true;
+    updateCount();
+  });
+
+  btnNone.addEventListener('click', () => {
+    rows.forEach(r => { r.querySelector('.row-pick').checked = false; });
+    headPick.checked = false;
+    updateCount();
+  });
+
+  chips.forEach(c => c.addEventListener('click', () => {
+    chips.forEach(x => x.classList.remove('active'));
+    c.classList.add('active');
+    const want = c.dataset.supplier;
+    rows.forEach(r => {
+      r.style.display = (want === '*' || r.dataset.supplier === want) ? '' : 'none';
+    });
+    updateCount();
+  }));
+
+  // Click an order-divider to toggle all rows of that order
+  dividers.forEach(d => d.addEventListener('click', (e) => {
+    if (e.target.tagName === 'A') return;
+    const ord = d.dataset.order;
+    const orderRows = rows.filter(r => r.dataset.order === ord && r.style.display !== 'none');
+    const allChecked = orderRows.every(r => r.querySelector('.row-pick').checked);
+    orderRows.forEach(r => { r.querySelector('.row-pick').checked = !allChecked; });
+    updateCount();
+  }));
+
+  btnPrint.addEventListener('click', () => {
+    document.body.classList.add('printing');
+    if (groupPagesCb.checked) document.body.classList.add('group-pages');
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => {
+        document.body.classList.remove('printing');
+        document.body.classList.remove('group-pages');
+      }, 100);
+    }, 50);
+  });
+
+  updateCount();
+})();
+</script>
+
+</body>
+</html>
