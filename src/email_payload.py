@@ -46,6 +46,9 @@ def build_event_dict(data, insight):
         "unfulfilled_count": data.get("unfulfilled_count", 0),
         "unfulfilled_items": data.get("unfulfilled_items", []),
         "new_orders_count": data.get("new_orders_count", 0),
+        # ^ each item dict carries: product, size, color, quantity,
+        # supplier ('Cotton Avenue' / 'אחר' / ''), order_number_short,
+        # order_admin_url, is_new_today.
 
         "insight": insight,
         "report_time": datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC"),

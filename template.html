@@ -58,12 +58,13 @@
                    style="border-collapse:collapse;font-size:13px;border:1px solid #e8e1d4;">
               <thead>
                 <tr style="background:#1a1a1a;color:#ffffff;">
-                  <th width="40"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">#</th>
+                  <th width="36"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">#</th>
                   <th               align="right" style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">מוצר</th>
-                  <th width="110" align="right"  style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">מידה</th>
-                  <th width="80"  align="right"  style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">צבע</th>
-                  <th width="55"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">כמות</th>
-                  <th width="80"  align="left"   style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;">הזמנה</th>
+                  <th width="95"  align="right"  style="padding:10px 8px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">ספק</th>
+                  <th width="105" align="right"  style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">מידה</th>
+                  <th width="75"  align="right"  style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">צבע</th>
+                  <th width="50"  align="center" style="padding:10px 6px;font-size:11px;font-weight:600;letter-spacing:1px;border-left:1px solid #333;">כמות</th>
+                  <th width="75"  align="left"   style="padding:10px 10px;font-size:11px;font-weight:600;letter-spacing:1px;">הזמנה</th>
                 </tr>
               </thead>
               <tbody>
@@ -74,6 +75,13 @@
                   </td>
                   <td align="right" style="padding:9px 10px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#1a1a1a;">
                     {{ item.product }}
+                  </td>
+                  <td align="right" style="padding:9px 8px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;font-size:11px;">
+                    {% if item.supplier == 'Cotton Avenue' %}
+                    <span style="display:inline-block;padding:2px 8px;border-radius:10px;background:#E3F2FD;color:#0D47A1;font-weight:600;">{{ item.supplier }}</span>
+                    {% elif item.supplier %}
+                    <span style="display:inline-block;padding:2px 8px;border-radius:10px;background:#F5F5F5;color:#555;font-weight:600;">{{ item.supplier }}</span>
+                    {% endif %}
                   </td>
                   <td align="right" style="padding:9px 10px;border-bottom:1px solid #eee5d6;border-left:1px solid #f3ebda;color:#555;">
                     {{ item.size }}
