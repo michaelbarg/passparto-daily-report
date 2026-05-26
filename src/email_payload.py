@@ -3,7 +3,12 @@
 Used by both klaviyo_event.py (sends as Klaviyo event properties) and
 direct_send.py (renders template with it locally and ships via Resend).
 """
+import os
 from datetime import datetime, timezone
+
+PICKSLIP_URL = os.environ.get(
+    "PICKSLIP_URL", "https://passparto-pickslip.onrender.com/"
+).strip()
 
 
 def build_event_dict(data, insight):
@@ -52,4 +57,6 @@ def build_event_dict(data, insight):
 
         "insight": insight,
         "report_time": datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC"),
+
+        "pickslip_url": PICKSLIP_URL,
     }
