@@ -9,11 +9,7 @@ import os, json, time, requests
 from datetime import datetime, timedelta, timezone
 
 from orders_collector import get_unfulfilled_orders
-from airtable_lookup import (
-    build_open_orders_map,
-    build_supplier_map,
-    supplier_label,
-)
+from supplier_rules import classify_supplier, display_product_name
 
 KLAVIYO_KEY = os.environ.get("KLAVIYO_KEY", "")
 KLAVIYO_HEADERS = {
@@ -323,43 +319,19 @@ def collect_all():
     print("  Fetching unfulfilled orders...")
     unfulfilled_orders = get_unfulfilled_orders()
 
-    print("  Enriching from Airtable (CA names + suppliers)...")
-    order_numbers_with_hash = []
-    product_ids = set()
-    for o in unfulfilled_orders:
-        on_short = o.get("order_number_short", "")
-        if on_short:
-            order_numbers_with_hash.append(f"#{on_short}")
-        for li in o.get("line_items_detail") or []:
-            pid = li.get("product_id")
-            if pid:
-                product_ids.add(str(pid))
-
-    open_orders_map = build_open_orders_map(order_numbers_with_hash)
-    supplier_map = build_supplier_map(product_ids)
-    print(f"    Airtable matches: {len(open_orders_map)} CA names, "
-          f"{len(supplier_map)} suppliers")
-
     unfulfilled_items = []
     for o in unfulfilled_orders:
-        on_key = f"#{o.get('order_number_short','')}"
         for li in o.get("line_items_detail") or []:
             shopify_title = li["product"]
-            ca_lookup = open_orders_map.get(
-                (on_key, shopify_title.strip().lower()), {}
-            )
-            ca_name = ca_lookup.get("ca_name", "")
-            display_product = ca_name or shopify_title
-            supplier_raw = supplier_map.get(str(li.get("product_id") or ""), "")
             unfulfilled_items.append({
-                "product": display_product,
-                "size": li.get("size", ""),
-                "color": li.get("color", ""),
+                "product":  display_product_name(shopify_title),
+                "size":     li.get("size", ""),
+                "color":    li.get("color", ""),
                 "quantity": li["quantity"],
-                "supplier": supplier_label(supplier_raw),
+                "supplier": classify_supplier(shopify_title),
                 "order_number_short": o.get("order_number_short", ""),
-                "order_admin_url": o.get("order_admin_url", ""),
-                "is_new_today": o.get("is_new_today", False),
+                "order_admin_url":    o.get("order_admin_url", ""),
+                "is_new_today":       o.get("is_new_today", False),
             })
 
     new_orders_count = sum(1 for o in unfulfilled_orders if o.get("is_new_today"))
