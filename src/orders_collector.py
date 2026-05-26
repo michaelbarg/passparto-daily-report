@@ -322,7 +322,7 @@ def _split_variant(variant_title):
 
 
 def _shopify_line_items_detail(line_items):
-    """One dict per Shopify line item with product/size/color/quantity."""
+    """One dict per Shopify line item with product/size/color/quantity/product_id."""
     out = []
     if not isinstance(line_items, list):
         return out
@@ -332,18 +332,20 @@ def _shopify_line_items_detail(line_items):
         product = it.get("title") or it.get("name") or ""
         size, color = _split_variant(it.get("variant_title"))
         qty = it.get("quantity") or 1
+        product_id = str(it.get("product_id") or "")
         if product:
             out.append({
                 "product": product,
                 "size": size,
                 "color": color,
                 "quantity": qty,
+                "product_id": product_id,
             })
     return out
 
 
 def _klaviyo_line_items_detail(items):
-    """One dict per Klaviyo Placed-Order Item with product/size/color/quantity."""
+    """One dict per Klaviyo Placed-Order Item with product/size/color/quantity/product_id."""
     out = []
     if not isinstance(items, list):
         return out
@@ -369,12 +371,19 @@ def _klaviyo_line_items_detail(items):
         )
         size, color = _split_variant(variant)
         qty = it.get("Quantity") or it.get("quantity") or 1
+        product_id = str(
+            it.get("ProductID")
+            or it.get("Product ID")
+            or it.get("product_id")
+            or ""
+        )
         if product:
             out.append({
                 "product": product,
                 "size": size,
                 "color": color,
                 "quantity": qty,
+                "product_id": product_id,
             })
     return out
 
