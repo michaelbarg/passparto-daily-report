@@ -1,83 +1,168 @@
 # Passparto Daily Report — Status
 
-> 🔒 **נעול ופעיל** מ-25.05.2026 15:51 IL. מייל יומי אוטומטי דרך Resend, נתונים חיים מ-Shopify, מחר ב-06:00 IL הריצה הבאה.
+> 🔒 **נעול ופעיל**. מייל יומי אוטומטי דרך Resend, נתונים חיים מ-Shopify.
 >
-> מסמך חי. מתעדכן אחרי כל שינוי משמעותי. לסטטוס בזמן-אמת על Render הריצו:
+> מסמך זה הוא **המקור האחד** למצב המערכת — אחרי כל שינוי משמעותי הוא מתעדכן (היסטוריה + קונפיגורציה + מה פתוח).
+>
+> לסטטוס runtime *בזמן אמת* (deploy פעיל, ריצה אחרונה, env vars):
+> ```bash
+> RENDER_API_KEY=… python3 scripts/status.py
 > ```
-> RENDER_API_KEY=... python3 scripts/status.py
-> ```
 
-## הגדרות נעולות
+---
 
-| אספקט | ערך |
-|---|---|
-| **תזמון** | `0 3 * * *` UTC = **06:00 IL** (DST). בחורף 05:00 IL. |
-| **ערוץ שליחה** | Resend ישיר מ-`reports@passparto.com` (Klaviyo Flow כ-fallback בלבד) |
-| **מקור הזמנות** | Shopify Admin API live, אימות OAuth `client_credentials` (טוקן `shpat_` חי כל ריצה) |
-| **קריטריון הזמנה לטיפול** | `status=open` + `fulfillment_status=unfulfilled` + `financial_status=paid\|authorized` + `name >= #1776` + `total > 0` |
-| **חתך מספר התחלה** | `#1776` (שינוי דרך `SHOPIFY_MIN_ORDER_NUMBER` env) |
-| **מקסימום הזמנות במייל** | 100 (כרגע ~54 בפועל) |
-| **עמודות בטבלה** | `# \| מוצר \| מידה \| צבע \| כמות \| הזמנה` (קישור לעמוד ההזמנה ב-Shopify admin) |
-| **Badge בראש** | `🆕 N חדשות מאתמול` (לפי `created_at` ב-24h אחרונות) |
-
-## עכשיו
+## מצב המערכת
 
 | | |
 |---|---|
-| **שירות** | `passparto-daily-report` (Render cron) |
-| **תזמון** | `0 3 * * *` UTC = **06:00 בבוקר ישראל** (DST). בחורף הקרון יקפוץ ל-05:00 IL כש-Israel עוברת ל-UTC+2. |
-| **Branch** | `main` (auto-deploy on push) |
+| **שירות** | `passparto-daily-report` (Render cron) — `crn-d7ovvo0g4nts7387q580` |
+| **Repo / branch** | [michaelbarg/passparto-daily-report](https://github.com/michaelbarg/passparto-daily-report) — `main` (auto-deploy on push) |
 | **Region** | Oregon |
-| **נמען** | `MICHAEL_EMAIL` שמוגדר ב-Render |
+| **תזמון** | `0 3 * * *` UTC = **06:00 בבוקר ישראל** (DST). בחורף יקפוץ ל-05:00 IL כש-Israel עוברת ל-UTC+2. |
+| **ערוץ שליחה** | **Resend ישיר** מ-`reports@passparto.com`. Klaviyo Flow קיים רק כ-fallback אם Resend נופל. |
+| **נמען** | `MICHAEL_EMAIL` (`michael@passparto.com`) |
+| **מקור הזמנות** | Shopify Admin API live, אימות OAuth `client_credentials` (טוקן `shpat_` חי כל ריצה — אין צורך בטוקן סטטי) |
+| **חנות** | `1fs2bv-ut.myshopify.com` (= `www.passparto.co.il`) |
 
-## מה הושלם
+---
 
-- [x] **תיקון רינדור המייל** — הסרה של `{{ event.campaigns_html }}`/`flows_html` שמעולם לא נשלחו, החלפה ב-`{% for %}` תקין על המערכים `event.campaigns` / `event.flows`. ה"מייל לא הגיע מסודר" מפסיק.
-- [x] **טבלת "הזמנות לטיפול"** בראש המייל. RTL, צ'קבוקס ויזואלי בטור הראשון, עמודת כתובת למשלוח, badges צבעוניים לפי ימים פתוחים (אדום ל-3+ ימים), שורות מתחלפות, empty-state ידידותי.
-- [x] **מודול `orders_collector.py`** — מקור עיקרי Shopify Admin API, fallback ל-Klaviyo events.
-- [x] **עדכון לוח זמנים ל-06:00 IL** — נכתב ב-`render.yaml` (לפריסות עתידיות) וגם ב-API ישירות על השירות הקיים.
-- [x] **`scripts/trigger_now.py`** — כלי טריגר חיצוני דרך Render API.
-- [x] **`scripts/status.py`** — כלי סטטוס חי שמושך מ-Render API את המצב האמיתי בכל רגע.
-- [x] **PR #1 ממוזג, נפרס, ורצה ב-Render** — commit `b22b779b` הוא ה-deploy הפעיל.
-- [x] **ריצה ראשונה ידנית בוצעה** — `job-d8a145p9rddc739ma0l0`, succeeded (11m 35s), 09:10–09:22 UTC ב-25.05.
-- [x] **Shopify env vars מקושרים דרך env-group `cotton-sync-secrets`** — `SHOPIFY_STORE_URL` + `SHOPIFY_ADMIN_TOKEN`. הקוד מקבל את כל הוריאציות הללו (`SHOPIFY_STORE_DOMAIN` / `SHOPIFY_STORE_URL` / `SHOPIFY_DOMAIN`, ו-`SHOPIFY_ADMIN_API_TOKEN` / `SHOPIFY_ADMIN_TOKEN` / `SHOPIFY_TOKEN`), ומנקה http(s) ועריכה אם הערך הוא URL מלא.
-- [x] **`status.py` מעודכן** — מציג גם משתנים שמגיעים דרך linked env-groups, כולל איזה group מספק כל אחד.
-- [x] **שליחה ישירה דרך Resend (PR #4 + #5)** — עוקפת לחלוטין את Klaviyo Flow + Smart Sending. התבנית `template.html` הומרה ל-Jinja2; `src/email_payload.py` הוא מקור אמת יחיד למבנה ה-event; `src/direct_send.py` שולח דרך `https://api.resend.com/emails` מהדומיין המאומת `reports@passparto.com`. אם Resend נכשל → fallback ל-Klaviyo.
-- [x] **שליחה חיה אומתה** ב-25.05.2026 11:05 UTC: id=`a2e49a91-c650-4b19-ae7d-c17ea7c22b36`, last_event=`delivered`, 0 Klaviyo events חדשים (לא נדרש fallback).
+## מה במייל
+
+### טבלת "הזמנות לטיפול"
+
+7 עמודות (RTL):
+
+```
+#  |  מוצר  |  ספק  |  מידה  |  צבע  |  כמות  |  הזמנה
+```
+
+- **שורה לכל line item** — הזמנה עם 3 פריטים = 3 שורות שחולקות מספר הזמנה אחד.
+- מספור סידורי רץ דרך כל הפריטים (`loop.index`).
+- **מספר הזמנה הוא קישור** לעמוד ההזמנה ב-Shopify admin: `https://1fs2bv-ut.myshopify.com/admin/orders/{id}`.
+- **🆕** מסומן ליד הזמנות שנפתחו ב-24 השעות האחרונות.
+- **Badge בראש הסעיף**: `🆕 N חדשות מאתמול`.
+- כשאין הזמנות פתוחות — מודעה ירוקה "✅ אין הזמנות פתוחות לטיפול. עבודה טובה!"
+
+### קריטריון "הזמנה לטיפול"
+
+```
+status                = open                   (לא בוטל / לא ארכיון)
+fulfillment_status    = unfulfilled             (לא partial — ממש לא יצא)
+financial_status      = paid OR authorized      (כסף הועבר או מאושר לחיוב)
+order number (name)   ≥ #1776                  (חתך תפעולי, ניתן לשינוי)
+total_price           > 0                       (מסנן ₪0 לכל מקרה)
+```
+
+### סיווג ספק (Cotton Avenue ברירת מחדל + חוקים)
+
+`src/supplier_rules.py`:
+
+```python
+NON_CA_PATTERNS = [
+    (r"MICHSAF|מיקסף",        "MICHSAF"),
+    (r"\bnaaman\b|נעמן",       "נעמן"),
+    (r"\bsoltam\b|סולתם",      "סולתם"),
+    (r"החלקה",                 "החלקה"),
+    (r"ויסקו",                 "ויסקו"),
+    (r"מארז\s*יוקרתי.*מגבות"
+     r"|מארז\s*\d+\s*מגבות"
+     r"|מגבות\s*\d{3}\s*ג"
+     r"|מגבות.*במשקל\s*\d{3}", "מגבות יוקרתי"),
+    (r"\bחשמל\b|מוצרי\s*חשמל", "חשמל"),
+]
+DEFAULT_SUPPLIER = "Cotton Avenue"
+
+NAME_OVERRIDES = [
+    (r"דריה",                            "סאטן 500 רקומה בזהב"),
+    (r"טופר.*פספרטו|טופר\s*למזרן",       "טופר"),
+]
+```
+
+הוספת חוק חדש = שורה אחת בקובץ הזה. אין סנכרון Airtable; Cotton Avenue ברירת מחדל.
+
+### סעיפים נוספים במייל
+
+קמפיינים אתמול · Flows אקטיביים · בסיס הלקוחות (סגמנטים) · סיכום הכנסות · תובנת AI יומית.
+
+---
+
+## איך מפעילים ידנית
+
+```bash
+RENDER_API_KEY=… RENDER_SERVICE_ID=crn-d7ovvo0g4nts7387q580 \
+  python3 scripts/trigger_now.py
+```
+
+או ב-Render dashboard: `passparto-daily-report` ← **Trigger Run**.
+
+ריצה אורכת 11–14 דקות (Klaviyo rate-limit מאט קריאות statistics; Shopify עצמה מהירה — 1–3 שניות).
+
+---
+
+## משתני סביבה
+
+| שם | מקור | תפקיד |
+|---|---|---|
+| `KLAVIYO_KEY` | service-direct | קמפיינים, Flows, fallback delivery |
+| `ANTHROPIC_API_KEY` | service-direct | תובנת AI יומית |
+| `MICHAEL_EMAIL` | service-direct | נמען המייל |
+| `KLAVIYO_PLACED_ORDER_METRIC_ID` | service-direct | חוסך metric discovery |
+| `SHOPIFY_STORE_URL` | env-group `cotton-sync-secrets` | דומיין החנות |
+| `SHOPIFY_ADMIN_TOKEN` | env-group `cotton-sync-secrets` | (לא נחוץ; OAuth מתעדף) |
+| `SHOPIFY_CLIENT_ID` | env-group `cotton-sync-secrets` | OAuth client_credentials |
+| `SHOPIFY_CLIENT_SECRET` | env-group `cotton-sync-secrets` | OAuth client_credentials |
+| `RESEND_API_KEY` | env-group `cotton-sync-secrets` | שליחת המייל |
+| `SHOPIFY_MIN_ORDER_NUMBER` | (אופציונלי, default 1776) | חתך מספר התחלה |
+| `UNFULFILLED_MAX_IN_EMAIL` | (אופציונלי, default 100) | חיתוך לטבלה |
+| `REPORT_FROM_EMAIL` | (אופציונלי, default `reports@passparto.com`) | from |
+
+---
 
 ## מה פתוח
 
-- [ ] **סיבוב סודות שנחשפו בצ'אט.** Render API החזיר את כל הסודות בערכים גלויים כשהשתמשתי ב-`RENDER_API_KEY`. כדאי לסובב:
+- [ ] **סיבוב סודות שנחשפו בצ'אט** (לא דחוף — תלות פנימית בלבד):
   - `RENDER_API_KEY` ([dashboard](https://dashboard.render.com/u/settings#api-keys))
   - `KLAVIYO_KEY` (Klaviyo: Profile → Account → API Keys)
   - `ANTHROPIC_API_KEY` ([Console](https://console.anthropic.com))
   - `RESEND_API_KEY` ([Resend dashboard](https://resend.com/api-keys))
   - `SHOPIFY_ADMIN_TOKEN` (Shopify admin → Apps → uninstall + reinstall)
 
-- [ ] **לאמת את `passparto.co.il` ב-Resend** (אופציונלי) — אם תעדיף שהמייל יגיע מ-`@passparto.co.il` במקום `@passparto.com`. אחרת, ברירת המחדל הנוכחית `reports@passparto.com` עובדת מצוין.
+- [ ] **לאמת את `passparto.co.il` ב-Resend** (אופציונלי) — אם תעדיף שהמייל יגיע מ-`@passparto.co.il` במקום `@passparto.com`.
 
-- [ ] **תיקון DST** (אופציונלי, לא דחוף) — Render cron הוא UTC. אפשר להוסיף ל-`main.py` בדיקה שמדלגת על ריצה כשהיא בכיוון השעון של ישראל לא 06:00, או לעדכן ידנית פעמיים בשנה. נכון לעכשיו `0 3 * * *` נותן 06:00 בקיץ ו-05:00 בחורף.
+- [ ] **תיקון DST** (אופציונלי, לא דחוף) — Render cron הוא UTC. כרגע `0 3 * * *` נותן 06:00 בקיץ ו-05:00 בחורף. אפשר להוסיף ל-`main.py` בדיקה שמדלגת על ריצה כשהיא לא 06:00 בישראל, או לעדכן ידנית פעמיים בשנה.
 
-## איך מפעילים ידנית "מייל עכשיו"
+- [ ] **בדיקה אם Klaviyo שלח מייל "ההזמנה יצאה"** (סימון ירוק/אדום ליד כל הזמנה לפי האם הלקוח קיבל עדכון משלוח). תוגדר כשתבקש.
 
-```bash
-RENDER_API_KEY=...   RENDER_SERVICE_ID=crn-d7ovvo0g4nts7387q580   python3 scripts/trigger_now.py
-```
+- [ ] **הוספת חוקים נוספים ל-`supplier_rules.py`** ככל שיתגלו מוצרים שמסווגים שגויים. עדכון = שורה אחת בקובץ.
 
-או ב-Render dashboard: `passparto-daily-report` ← **Trigger Run**.
+---
 
-## שינויים אחרונים (chronological)
+## היסטוריה כרונולוגית
 
-- **25.05.2026 09:09 UTC** — Merge של PR #1 ל-main; Render redeploy אוטומטית; commit פעיל = `b22b779b`.
-- **25.05.2026 09:10 UTC** — ריצה ידנית ראשונה דרך Render API (job-d8a145…). הסתיימה ב-`succeeded` ב-09:22.
-- **25.05.2026 09:38 UTC** — Render schedule עודכן ל-`0 3 * * *` דרך API (היה `0 5 * * *`).
-- **25.05.2026 09:?? UTC** — אליאסים לשמות env של Shopify (`SHOPIFY_ADMIN_TOKEN`, `SHOPIFY_TOKEN`, `SHOPIFY_DOMAIN`) + קובץ STATUS.md זה (PR #2).
-- **25.05.2026 09:58 UTC** — תמיכה ב-`SHOPIFY_STORE_URL` ובסודות מ-env-groups מקושרים, `_normalize_shopify_domain()` (PR #3).
-- **25.05.2026 10:32 UTC** — מסלול שליחה ישיר דרך Resend, Jinja2 instead of Klaviyo Flow (PR #4).
-- **25.05.2026 10:51 UTC** — תיקון from-domain: `reports@passparto.com` (לא `support@passparto.co.il`, שלא מאומת ב-Resend) (PR #5).
-- **25.05.2026 11:05 UTC** — ריצה אומתה: מייל נמסר דרך Resend (`a2e49a91-c650-4b19-ae7d-c17ea7c22b36`), Klaviyo לא הופעל. **המסלול הראשי כעת עובד end-to-end.**
-- **25.05.2026 11:38 UTC** — מבנה טבלה חדש (PR #7): שורה לכל line item, 5 עמודות, מספרי הזמנה כקישורים ל-Shopify admin, badge `🆕 חדשות מאתמול`. נמסר עם ה-id `eb6353bc...`.
-- **25.05.2026 11:43 UTC** — הוספת עמודת צבע (PR #8): פיצול `variant_title` ל-מידה+צבע. נמסר עם ה-id `de0e2d50...`.
-- **25.05.2026 12:11 UTC** — אימות Shopify live (PR #9): `client_credentials` OAuth → `shpat_` חי. גילוי שהיו 1154 הזמנות לא-שלמות בכלל הזמנים, רובן legacy.
-- **25.05.2026 12:39 UTC** — סינון מדויק (PR #10 + #11): `status=open` + `unfulfilled` + `paid|authorized` + `name>=#1776` → 54 הזמנות אמיתיות. בוטל הסינון לפי 30 יום.
-- **25.05.2026 12:51 UTC** — ריצה אומתה סופית (`52fb7edd-a883-4384-9241-b4461fde820c`): 54 הזמנות מ-#1776 עד #2155, נמסר ב-15:51 IL. **🔒 נעול.**
+### יום 1 — 25.05.2026
+
+| שעה (UTC) | אירוע |
+|---|---|
+| 09:09 | Merge PR #1: תיקון רינדור הקמפיינים/Flows + טבלת "הזמנות לטיפול" עם צ'קבוקס/כתובת. Render redeploy. |
+| 09:10 | ריצה ידנית ראשונה (`job-d8a145…`) — succeeded, אבל מוצרים מ-Klaviyo events fallback (Shopify token לא תקף). |
+| 09:38 | Render schedule עודכן `0 5 * * *` → `0 3 * * *` (08:00 IL → 06:00 IL DST). |
+| 09:58 | PR #3: תמיכה ב-`SHOPIFY_STORE_URL` ובסודות מ-env-groups מקושרים. |
+| 10:32 | PR #4: שליחה ישירה דרך Resend, Jinja2 templating (לא Klaviyo Flow). |
+| 10:51 | PR #5: תיקון from-domain ל-`reports@passparto.com` (passparto.co.il לא מאומת ב-Resend). |
+| 11:05 | ✅ **מייל ראשון שנמסר דרך Resend** — `a2e49a91…`, last_event=`delivered`, 0 Klaviyo events. |
+| 11:38 | PR #7: מבנה טבלה חדש — שורה לכל line item, מספרי הזמנה כקישורים ל-Shopify admin, badge `🆕 חדשות מאתמול`. |
+| 11:43 | PR #8: עמודת צבע נפרדת (`variant_title` מתפצל למידה+צבע). |
+| 12:11 | PR #9: גילוי + יישום OAuth `client_credentials` → `shpat_` חי. החנות מאומתת: פספרטו, ILS, www.passparto.co.il. הראיתי שיש 1154 הזמנות פתוחות בכלל הזמנים, רובן legacy. |
+| 12:39 | PR #10/11: סינון מדויק `status=open` + `unfulfilled` + `paid\|authorized` + `name>=#1776` → 54 הזמנות אמיתיות. |
+| 12:51 | ✅ **ריצה סופית של היום** (`52fb7edd…`) עם 54 הזמנות מ-#1776 עד #2155. **🔒 נעול.** |
+
+### יום 2 — 26.05.2026
+
+| שעה (UTC) | אירוע |
+|---|---|
+| 03:11 | ✅ **ריצה אוטומטית ראשונה** (06:11 IL) — `94083fcd…`, 42 הזמנות (12 נשלחו בלילה, 1 חדשה #2156). דרך Resend. |
+| 04:30 | PR #13: ניסיון להוסיף שמות Cotton Avenue + עמודת ספק דרך Airtable. **לא הצליח** — ה-`Source Type` תייג מדי הרבה מוצרים כ-"אחר". |
+| 04:40 | מייל ידני (`6aa6faeb…`) עם הניסיון של PR #13 — סיווג שגוי מ-Airtable. |
+| 04:55 | PR #14: **רוויזיה לפי הוראות המפעיל** — Cotton Avenue ברירת מחדל, חוקי regex פר-קטגוריה (MICHSAF, נעמן, סולתם, ויסקו, החלקה, מגבות יוקרתי, חשמל), + 2 name overrides (דריה → סאטן 500 רקומה בזהב; טופר פספרטו → טופר). |
+| 04:56 | ריצה ידנית עם הקוד החדש מ-PR #14. |
+| 05:14 | האחדת `STATUS.md` (PR #15). |
