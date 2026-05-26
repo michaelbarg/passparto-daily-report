@@ -53,6 +53,22 @@
               </tr>
             </table>
 
+            {% if event.pickslip_url and event.unfulfilled_items %}
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:14px;">
+              <tr>
+                <td align="center" style="background:#1a1a1a;padding:14px 18px;border-radius:6px;">
+                  <a href="{{ event.pickslip_url }}" target="_blank"
+                     style="display:inline-block;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;letter-spacing:0.5px;line-height:1.4;">
+                    🖨 פתח דף ליקוט אינטראקטיבי&nbsp;→
+                  </a>
+                  <p style="margin:6px 0 0;color:#c9a96e;font-size:11px;">
+                    סמן שורות, סנן לפי ספק, הדפס PDF — נתונים חיים מ-Shopify
+                  </p>
+                </td>
+              </tr>
+            </table>
+            {% endif %}
+
             {% if event.unfulfilled_items %}
             <table width="100%" cellpadding="0" cellspacing="0" border="0"
                    style="border-collapse:collapse;font-size:13px;border:1px solid #e8e1d4;">
