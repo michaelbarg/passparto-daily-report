@@ -36,6 +36,8 @@ def main():
 
         cs_status = fetch_cotton_sync_status()
         data["cs_pending_count"] = cs_status["pending_count"]
+        data["cs_restock_count"] = cs_status["restock_count"]
+        data["cs_zero_count"] = cs_status["zero_count"]
         data["cs_last_scan_time"] = cs_status["last_scan_time"]
 
         print("\n[2/3] Generating insight...")

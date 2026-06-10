@@ -1,6 +1,7 @@
 """Fetch Cotton Sync status from Airtable Daily Changes table.
 
-Returns pending-change count and last-scan timestamp for the daily email.
+Returns inventory-pending count (restock + zero + new_product only)
+and last-scan timestamp for the daily email approval line.
 """
 import os
 
@@ -11,27 +12,38 @@ BASE_ID = "appJk6ew0rY76D1pD"
 TABLE_ID = "tbly6XUUAGgCUIaZ3"
 HEADERS = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
 
+# Only these change types go to Daily Changes / appear in approval count
+APPROVAL_TYPES = ("inventory_restock", "inventory_zero", "new_product")
+
 
 def fetch_cotton_sync_status():
-    """Return dict with pending_count and last_scan_time.
+    """Return dict with counts and last scan time.
 
-    - pending_count: rows where Status='Pending' AND My Decision is empty
-    - last_scan_time: max Date Detected across all rows (DD.MM.YYYY HH:MM)
+    - pending_count: total inventory changes pending (restock + zero + new_product)
+    - restock_count: inventory_restock pending
+    - zero_count: inventory_zero pending
+    - last_scan_time: max Date Detected (DD.MM.YYYY HH:MM)
     """
     if not AIRTABLE_TOKEN:
         print("  [WARN] AIRTABLE_API_TOKEN not set — skipping Cotton Sync status")
-        return {"pending_count": 0, "last_scan_time": ""}
+        return {"pending_count": 0, "restock_count": 0, "zero_count": 0, "last_scan_time": ""}
 
     base_url = f"https://api.airtable.com/v0/{BASE_ID}/{TABLE_ID}"
-    pending_count = 0
+    restock = 0
+    zero = 0
+    new_prod = 0
     last_scan = ""
 
     try:
-        # 1) Count pending rows (Status=Pending, My Decision empty)
+        # Count pending inventory rows by type
+        formula = (
+            "AND({Status}='Pending',{My Decision}='',"
+            "OR({Change Type}='inventory_restock',{Change Type}='inventory_zero',{Change Type}='new_product'))"
+        )
         params = {
-            "filterByFormula": "AND({Status}='Pending',{My Decision}='')",
+            "filterByFormula": formula,
             "pageSize": 100,
-            "fields[]": ["Status"],
+            "fields[]": ["Change Type"],
         }
         offset = None
         while True:
@@ -40,12 +52,19 @@ def fetch_cotton_sync_status():
             r = requests.get(base_url, headers=HEADERS, params=params, timeout=15)
             r.raise_for_status()
             data = r.json()
-            pending_count += len(data.get("records", []))
+            for rec in data.get("records", []):
+                ct = rec["fields"].get("Change Type", "")
+                if ct == "inventory_restock":
+                    restock += 1
+                elif ct == "inventory_zero":
+                    zero += 1
+                elif ct == "new_product":
+                    new_prod += 1
             offset = data.get("offset")
             if not offset:
                 break
 
-        # 2) Last scan time — most recent Date Detected
+        # Last scan time
         params2 = {
             "sort[0][field]": "Date Detected",
             "sort[0][direction]": "desc",
@@ -57,17 +76,22 @@ def fetch_cotton_sync_status():
         recs = r2.json().get("records", [])
         if recs:
             raw = recs[0]["fields"].get("Date Detected", "")
-            # Airtable ISO format: 2026-06-08T08:00:00.000Z → 08.06.2026 08:00
             if raw and "T" in raw:
                 date_part, time_part = raw.split("T")
                 yy, mm, dd = date_part.split("-")
                 hh_mm = time_part[:5]
-                last_scan = f"{dd}.{mm}.{yy} {hh_mm}"
+                last_scan = f"{dd}.{mm} {hh_mm}"
             elif raw:
                 last_scan = raw
 
     except Exception as e:
         print(f"  [WARN] Cotton Sync status fetch failed: {e}")
 
-    print(f"  Cotton Sync: {pending_count} pending, last scan: {last_scan or '?'}")
-    return {"pending_count": pending_count, "last_scan_time": last_scan}
+    total = restock + zero + new_prod
+    print(f"  Cotton Sync: {total} pending ({restock} restock, {zero} zero, {new_prod} new), scan: {last_scan or '?'}")
+    return {
+        "pending_count": total,
+        "restock_count": restock,
+        "zero_count": zero,
+        "last_scan_time": last_scan,
+    }
