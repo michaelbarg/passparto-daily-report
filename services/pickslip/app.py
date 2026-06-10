@@ -1,22 +1,17 @@
-"""Interactive picking sheet web service.
+"""Interactive picking sheet / supplier order web service.
 
-Renders the same unfulfilled-orders list that the daily email shows, but
-as a live interactive HTML page with per-row checkboxes, supplier
-filters, group-by-order grouping, and a 'Print selected' button that
-relies on the browser's native PDF export (no server-side PDF stack).
+Renders unfulfilled-orders as a live interactive HTML page with per-row
+checkboxes, supplier filters, editable order-quantity, and a 'Print
+selected' button that outputs a supplier order sheet with CA product names.
 
-URL pattern (single endpoint):
-
-  GET /                  HTML page rebuilt from a fresh Shopify query
-  GET /healthz           Liveness probe used by Render
-
-This service shares all logic with the cron — orders_collector.py,
-supplier_rules.py, etc. — by importing from the repo's `src/` directory.
-The free Render Web Service plan hibernates after 15 min idle; the
-first request after a sleep takes ~30s to wake.
+URL pattern:
+  GET /       HTML page rebuilt from a fresh Shopify query
+  GET /healthz  Liveness probe
 """
 import os
 import sys
+import requests
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -25,12 +20,91 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 from flask import Flask, render_template
 
-from orders_collector import get_unfulfilled_orders
+from orders_collector import (
+    get_unfulfilled_orders,
+    SHOPIFY_STORE_DOMAIN,
+    SHOPIFY_CLIENT_ID,
+    SHOPIFY_CLIENT_SECRET,
+    SHOPIFY_ADMIN_API_TOKEN,
+    SHOPIFY_API_VERSION,
+)
 from supplier_rules import classify_supplier, display_product_name
 
 
 app = Flask(__name__, template_folder="templates")
 
+
+# ── CA product name lookup via Shopify metafield ────────────────────
+
+def _get_shopify_token():
+    """Get a working Shopify access token (OAuth preferred, static fallback)."""
+    if SHOPIFY_CLIENT_ID and SHOPIFY_CLIENT_SECRET:
+        try:
+            r = requests.post(
+                f"https://{SHOPIFY_STORE_DOMAIN}/admin/oauth/access_token",
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": SHOPIFY_CLIENT_ID,
+                    "client_secret": SHOPIFY_CLIENT_SECRET,
+                },
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15,
+            )
+            if r.status_code == 200:
+                return r.json().get("access_token", "")
+        except Exception:
+            pass
+    return SHOPIFY_ADMIN_API_TOKEN or ""
+
+
+def _fetch_ca_names(product_ids):
+    """Batch-fetch CA product names from Shopify metafield cotton_sync.ca_product_title.
+
+    Returns dict: product_id (str, numeric) -> ca_name (str).
+    """
+    if not product_ids or not SHOPIFY_STORE_DOMAIN:
+        return {}
+
+    token = _get_shopify_token()
+    if not token:
+        return {}
+
+    gql_url = f"https://{SHOPIFY_STORE_DOMAIN}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+    headers = {"X-Shopify-Access-Token": token, "Content-Type": "application/json"}
+
+    ca_names = {}
+    # Process in batches of 50 (GraphQL alias limit)
+    unique_ids = list(set(product_ids))
+    for batch_start in range(0, len(unique_ids), 50):
+        batch = unique_ids[batch_start:batch_start + 50]
+        # Build aliased query
+        parts = []
+        for i, pid in enumerate(batch):
+            gid = f"gid://shopify/Product/{pid}"
+            parts.append(
+                f'p{i}: product(id: "{gid}") {{ '
+                f'id metafield(namespace: "cotton_sync", key: "ca_product_title") {{ value }} }}'
+            )
+        query = "{ " + " ".join(parts) + " }"
+
+        try:
+            r = requests.post(gql_url, headers=headers,
+                              json={"query": query}, timeout=20)
+            if r.status_code != 200:
+                continue
+            data = r.json().get("data", {})
+            for i, pid in enumerate(batch):
+                node = data.get(f"p{i}")
+                if node and node.get("metafield"):
+                    ca_names[pid] = node["metafield"]["value"]
+        except Exception as e:
+            print(f"  [WARN] CA name batch fetch failed: {e}")
+        time.sleep(0.3)
+
+    return ca_names
+
+
+# ── Build items ─────────────────────────────────────────────────────
 
 def _build_items():
     """Fetch and flatten unfulfilled orders for the picking sheet."""
@@ -48,7 +122,17 @@ def _build_items():
                 "order_number_short": o.get("order_number_short", ""),
                 "order_admin_url":    o.get("order_admin_url", ""),
                 "is_new_today":       o.get("is_new_today", False),
+                "product_id":         li.get("product_id", ""),
+                "ca_name":            "",  # filled below
             })
+
+    # Batch-fetch CA names from Shopify metafields
+    product_ids = [it["product_id"] for it in items if it["product_id"]]
+    if product_ids:
+        ca_map = _fetch_ca_names(product_ids)
+        for it in items:
+            it["ca_name"] = ca_map.get(it["product_id"], "")
+
     return items, len(orders)
 
 
@@ -59,7 +143,7 @@ def picking_sheet():
     suppliers = sorted({i["supplier"] for i in items if i["supplier"]})
     new_orders_count = sum(
         1 for i in items if i["is_new_today"]
-    )  # this counts items, not orders, but useful for feedback
+    )
 
     il_now = datetime.now(timezone(timedelta(hours=3)))
 

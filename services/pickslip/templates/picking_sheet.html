@@ -61,11 +61,11 @@
   thead th:first-child { text-align: center; }
   thead th.col-pick { width: 40px; }
   thead th.col-num  { width: 36px; text-align: center; }
-  thead th.col-sup  { width: 110px; }
+  thead th.col-sup  { width: 95px; }
   thead th.col-size { width: 100px; }
-  thead th.col-col  { width: 80px; }
-  thead th.col-qty  { width: 50px; text-align: center; }
-  thead th.col-ord  { width: 90px; text-align: left; }
+  thead th.col-col  { width: 75px; }
+  thead th.col-qty  { width: 65px; text-align: center; }
+  thead th.col-ord  { width: 80px; text-align: left; }
 
   tbody td { padding: 9px 10px; border-bottom: 1px solid #eee5d6; vertical-align: middle; }
   tbody td.center { text-align: center; }
@@ -83,26 +83,59 @@
 
   input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
 
+  /* Editable order quantity */
+  .qty-input {
+    width: 48px; text-align: center; font-size: 14px; font-weight: 700;
+    border: 1px solid #d6d2c7; border-radius: 4px; padding: 4px 2px;
+    font-family: inherit; color: var(--black); background: #fff;
+  }
+  .qty-input:focus { border-color: var(--gold); outline: none; box-shadow: 0 0 0 2px rgba(201,169,110,.3); }
+
+  /* CA name (secondary, smaller) */
+  .ca-name { display: block; font-size: 11px; color: #888; margin-top: 2px; }
+
   .empty {
     text-align: center; padding: 40px; color: #2E7D32; font-size: 16px;
     background: var(--new-bg); border-right: 4px solid var(--new); margin: 24px;
     border-radius: 6px;
   }
 
-  /* Print: hide unchecked rows + chrome, A4-ish layout */
+  /* ─── Screen: hide print-only elements ────────────────────── */
+  .print-only { display: none; }
+
+  /* ─── Print layout: supplier order sheet ──────────────────── */
   @media print {
-    body { background: #fff; }
+    body { background: #fff; font-size: 12px; }
     .wrap { box-shadow: none; max-width: none; margin: 0; border-radius: 0; }
-    header { padding: 12px 16px; }
-    .controls, .filters { display: none !important; }
+    .controls, .filters, .screen-only { display: none !important; }
+    .print-only { display: block !important; }
     thead th { position: static; }
+
+    /* Hide unchecked rows */
     body.printing tbody tr.row:not(.checked) { display: none; }
     body.printing tbody tr.order-divider.empty-after { display: none; }
-    body.printing tbody tr td.left { direction: ltr; }
+
+    /* Hide screen-only columns (checkbox, supplier badge) */
+    body.printing .col-pick-cell,
+    body.printing .col-sup-cell,
+    body.printing thead th.col-pick,
+    body.printing thead th.col-sup { display: none; }
+
+    /* Show print-only columns */
+    body.printing .print-col { display: table-cell !important; }
+    body.printing thead .print-col-th { display: table-cell !important; }
+
+    /* qty-input → plain text */
+    body.printing .qty-input { border: none; background: transparent; font-weight: 700; }
+
     @page { size: A4; margin: 14mm; }
-    /* When grouping, push each order to a new page */
     body.printing.group-pages tbody tr.order-divider { page-break-before: always; }
     body.printing.group-pages tbody tr.order-divider:first-of-type { page-break-before: auto; }
+
+    /* Print header */
+    .print-header { display: block !important; padding: 12px 16px; border-bottom: 2px solid #000; margin-bottom: 8px; }
+    .print-header h2 { margin: 0; font-size: 16px; }
+    .print-header .meta { font-size: 11px; color: #666; }
   }
 </style>
 </head>
@@ -114,6 +147,12 @@
     <h1>📦 פספרטו · דף ליקוט יומי</h1>
     <div class="meta">{{ generated_at }} IL · {{ order_count }} הזמנות · {{ line_item_count }} פריטים</div>
   </header>
+
+  <!-- Print-only header (replaces the dark header in print) -->
+  <div class="print-header print-only" style="display:none;">
+    <h2>📦 הזמנה לספק — פספרטו</h2>
+    <div class="meta">{{ generated_at }} · <span id="print-count-label">0</span> פריטים נבחרו</div>
+  </div>
 
   {% if items %}
 
@@ -143,6 +182,8 @@
         <th class="col-pick"><input type="checkbox" id="head-pick"></th>
         <th class="col-num">#</th>
         <th>מוצר</th>
+        <!-- Print-only: CA name column header -->
+        <th class="print-col-th" style="display:none;">שם בכותון</th>
         <th class="col-sup">ספק</th>
         <th class="col-size">מידה</th>
         <th class="col-col">צבע</th>
@@ -155,7 +196,7 @@
       {% for item in items %}
         {% if item.order_number_short != ns.prev_order %}
           <tr class="order-divider" data-order="{{ item.order_number_short }}">
-            <td colspan="8">
+            <td colspan="9">
               הזמנה
               {% if item.order_admin_url %}
               <a class="order-link" href="{{ item.order_admin_url }}" target="_blank">#{{ item.order_number_short }}</a>
@@ -170,11 +211,19 @@
         {% set ns.idx = ns.idx + 1 %}
         <tr class="row {% if ns.idx % 2 == 0 %}zebra{% endif %}"
             data-supplier="{{ item.supplier }}"
-            data-order="{{ item.order_number_short }}">
-          <td class="center"><input type="checkbox" class="row-pick"></td>
+            data-order="{{ item.order_number_short }}"
+            data-orig-qty="{{ item.quantity }}">
+          <td class="center col-pick-cell"><input type="checkbox" class="row-pick"></td>
           <td class="center">{{ ns.idx }}</td>
-          <td>{{ item.product }}</td>
           <td>
+            {{ item.product }}
+            {% if item.ca_name %}
+            <span class="ca-name screen-only">{{ item.ca_name }}</span>
+            {% endif %}
+          </td>
+          <!-- Print-only: CA name as separate column -->
+          <td class="print-col" style="display:none;">{{ item.ca_name or '' }}</td>
+          <td class="col-sup-cell">
             {% if item.supplier == 'Cotton Avenue' %}
               <span class="badge badge-ca">Cotton Avenue</span>
             {% elif item.supplier %}
@@ -183,7 +232,9 @@
           </td>
           <td>{{ item.size }}</td>
           <td>{{ item.color }}</td>
-          <td class="center"><strong>{{ item.quantity }}</strong></td>
+          <td class="center">
+            <input type="number" class="qty-input" value="{{ item.quantity }}" min="0" max="999">
+          </td>
           <td class="left">
             {% if item.order_admin_url %}
             <a class="order-link" href="{{ item.order_admin_url }}" target="_blank">#{{ item.order_number_short }}</a>
@@ -229,12 +280,15 @@
     countLabel.textContent = n;
     btnPrint.disabled = (n === 0);
     rows.forEach(r => r.classList.toggle('checked', r.querySelector('.row-pick').checked));
-    // hide empty order-dividers (when all rows of an order got hidden by filter)
+    // hide empty order-dividers
     dividers.forEach(d => {
       const ord = d.dataset.order;
       const any = rows.some(r => r.dataset.order === ord && r.style.display !== 'none');
       d.style.display = any ? '' : 'none';
     });
+    // Update print count label
+    const pcl = $('#print-count-label');
+    if (pcl) pcl.textContent = n;
   }
 
   rows.forEach(r => r.querySelector('.row-pick').addEventListener('change', updateCount));
