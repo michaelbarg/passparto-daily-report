@@ -32,6 +32,49 @@
         </tr>
 
         <!-- ════════════════════════════════════════════ -->
+        <!-- COTTON SYNC STATUS BAR                        -->
+        <!-- ════════════════════════════════════════════ -->
+        {% if event.cs_pending_count or event.cs_last_scan_time %}
+        <tr>
+          <td style="padding:20px 32px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#EDE7F6;border-radius:6px;overflow:hidden;">
+              <tr>
+                <td style="padding:16px 20px;">
+                  <p style="margin:0 0 6px;font-size:13px;color:#4A148C;font-weight:700;letter-spacing:1px;">
+                    🔄 Cotton Avenue Sync
+                  </p>
+                  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="padding:4px 0;">
+                        {% if event.cs_last_scan_time %}
+                        <p style="margin:0;font-size:12px;color:#555;">
+                          סריקה אחרונה: <strong style="color:#1a1a1a;">{{ event.cs_last_scan_time }}</strong>
+                        </p>
+                        {% endif %}
+                        {% if event.cs_pending_count %}
+                        <p style="margin:4px 0 0;font-size:12px;color:#555;">
+                          📋 <strong style="color:#C62828;">{{ event.cs_pending_count }}</strong> שינויים ממתינים לאישור
+                        </p>
+                        {% endif %}
+                      </td>
+                      <td width="160" align="left" style="vertical-align:middle;">
+                        <a href="https://airtable.com/appJk6ew0rY76D1pD/tbly6XUUAGgCUIaZ3"
+                           target="_blank"
+                           style="display:inline-block;background:#4A148C;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:10px 18px;border-radius:5px;white-space:nowrap;">
+                          פתח אישורים&nbsp;→
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        {% endif %}
+
+        <!-- ════════════════════════════════════════════ -->
         <!-- SECTION 0: UNFULFILLED ITEMS — THE ACTION LIST -->
         <!-- ════════════════════════════════════════════ -->
         <tr>

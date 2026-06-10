@@ -18,6 +18,7 @@ from data_collector import collect_all
 from insights_generator import generate_insight
 from klaviyo_event import send_daily_report_event
 from direct_send import send_direct, RESEND_API_KEY
+from cotton_sync_status import fetch_cotton_sync_status
 
 
 def main():
@@ -32,6 +33,10 @@ def main():
     try:
         print("\n[1/3] Collecting data...")
         data = collect_all()
+
+        cs_status = fetch_cotton_sync_status()
+        data["cs_pending_count"] = cs_status["pending_count"]
+        data["cs_last_scan_time"] = cs_status["last_scan_time"]
 
         print("\n[2/3] Generating insight...")
         insight = generate_insight(data)

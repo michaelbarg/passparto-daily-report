@@ -59,4 +59,7 @@ def build_event_dict(data, insight):
         "report_time": datetime.now(timezone.utc).strftime("%d.%m.%Y %H:%M UTC"),
 
         "pickslip_url": PICKSLIP_URL,
+
+        "cs_pending_count": data.get("cs_pending_count", 0),
+        "cs_last_scan_time": data.get("cs_last_scan_time", ""),
     }
