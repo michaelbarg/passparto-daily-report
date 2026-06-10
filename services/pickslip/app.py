@@ -104,6 +104,61 @@ def _fetch_ca_names(product_ids):
     return ca_names
 
 
+# ── Airtable fallback for CA names ──────────────────────────────────
+
+AIRTABLE_TOKEN = os.environ.get("AIRTABLE_API_TOKEN", "")
+AIRTABLE_BASE = "appJk6ew0rY76D1pD"
+AIRTABLE_HEADERS = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
+
+_ca_name_cache = {}  # sp_product_title_lower -> ca_name
+
+
+def _fetch_ca_names_airtable(shopify_titles):
+    """Fallback: build SP title → CA name map from Airtable Variant Map.
+
+    Variant Map (tbldO9Wj7CorWbfmY):
+      SP Product (flddyeVGPmhryHAgZ) → CA Product (fldlBKjuMzI7YD1i3)
+    """
+    if not AIRTABLE_TOKEN or not shopify_titles:
+        return {}
+
+    if _ca_name_cache:
+        return _ca_name_cache
+
+    vm_table = "tbldO9Wj7CorWbfmY"
+    url = f"https://api.airtable.com/v0/{AIRTABLE_BASE}/{vm_table}"
+    params = {
+        "pageSize": 100,
+        "fields[]": ["CA Product", "SP Product"],
+        "filterByFormula": "AND({CA Product}!='',{SP Product}!='')",
+    }
+
+    try:
+        offset = None
+        while True:
+            if offset:
+                params["offset"] = offset
+            r = requests.get(url, headers=AIRTABLE_HEADERS, params=params, timeout=20)
+            if r.status_code != 200:
+                break
+            data = r.json()
+            for rec in data.get("records", []):
+                f = rec["fields"]
+                sp = (f.get("SP Product") or "").strip()
+                ca = (f.get("CA Product") or "").strip()
+                if sp and ca:
+                    _ca_name_cache[sp.lower()] = ca
+            offset = data.get("offset")
+            if not offset:
+                break
+            time.sleep(0.25)
+    except Exception as e:
+        print(f"  [WARN] Airtable CA name fetch failed: {e}")
+
+    print(f"  Airtable CA name cache: {len(_ca_name_cache)} entries")
+    return _ca_name_cache
+
+
 # ── Build items ─────────────────────────────────────────────────────
 
 def _build_items():
@@ -132,6 +187,19 @@ def _build_items():
         ca_map = _fetch_ca_names(product_ids)
         for it in items:
             it["ca_name"] = ca_map.get(it["product_id"], "")
+
+    # Fallback: fill missing CA names from Airtable Variant Map
+    missing = [it for it in items if not it["ca_name"] and it["product"]]
+    if missing:
+        titles = [it["product"] for it in missing]
+        at_map = _fetch_ca_names_airtable(titles)
+        for it in missing:
+            ca = at_map.get(it["product"].lower())
+            if ca:
+                it["ca_name"] = ca
+
+    filled = sum(1 for it in items if it["ca_name"])
+    print(f"  CA names: {filled}/{len(items)} filled")
 
     return items, len(orders)
 
