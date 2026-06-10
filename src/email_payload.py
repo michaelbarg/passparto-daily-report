@@ -10,6 +10,12 @@ PICKSLIP_URL = os.environ.get(
     "PICKSLIP_URL", "https://passparto-pickslip.onrender.com/"
 ).strip()
 
+APPROVAL_TOKEN = os.environ.get("APPROVAL_TOKEN", "").strip()
+APPROVAL_BASE_URL = os.environ.get(
+    "APPROVAL_BASE_URL", "https://cotton-sync-webhooks-web.onrender.com"
+).strip()
+APPROVAL_FALLBACK = "https://airtable.com/appJk6ew0rY76D1pD/tbly6XUUAGgCUIaZ3"
+
 
 def build_event_dict(data, insight):
     summary = data.get("summary", {})
@@ -60,6 +66,10 @@ def build_event_dict(data, insight):
 
         "pickslip_url": PICKSLIP_URL,
 
+        "approval_url": (
+            f"{APPROVAL_BASE_URL}/approvals?t={APPROVAL_TOKEN}"
+            if APPROVAL_TOKEN else APPROVAL_FALLBACK
+        ),
         "cs_pending_count": data.get("cs_pending_count", 0),
         "cs_restock_count": data.get("cs_restock_count", 0),
         "cs_zero_count": data.get("cs_zero_count", 0),
