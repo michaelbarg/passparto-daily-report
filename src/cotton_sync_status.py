@@ -12,6 +12,7 @@ import requests
 AIRTABLE_TOKEN = os.environ.get("AIRTABLE_API_TOKEN", "")
 BASE_ID = "appJk6ew0rY76D1pD"
 TABLE_ID = "tbly6XUUAGgCUIaZ3"
+SYSTEM_CONFIG_TABLE = "tbl17eH3vLTUgcfMZ"
 HEADERS = {"Authorization": f"Bearer {AIRTABLE_TOKEN}"}
 
 # Only these change types go to Daily Changes / appear in approval count
@@ -68,32 +69,48 @@ def fetch_cotton_sync_status():
             if not offset:
                 break
 
-        # Last scan time
-        params2 = {
-            "sort[0][field]": "Date Detected",
-            "sort[0][direction]": "desc",
-            "pageSize": 1,
-            "fields[]": ["Date Detected"],
-        }
-        r2 = requests.get(base_url, headers=HEADERS, params=params2, timeout=15)
-        r2.raise_for_status()
-        recs = r2.json().get("records", [])
-        if recs:
-            raw = recs[0]["fields"].get("Date Detected", "")
-            if raw and "T" in raw:
-                date_part, time_part = raw.split("T")
-                yy, mm, dd = date_part.split("-")
-                hh_mm = time_part[:5]
-                last_scan = f"{dd}.{mm} {hh_mm}"
-                # Check staleness (>30 hours since last scan)
-                try:
-                    scan_dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-                    age = datetime.now(timezone.utc) - scan_dt
-                    scan_stale = age > timedelta(hours=30)
-                except Exception:
-                    pass
-            elif raw:
-                last_scan = raw
+        # Last scan time — prefer System Config heartbeat (written every detect run),
+        # fall back to Daily Changes Date Detected (only updates when changes exist).
+        raw = ""
+        try:
+            cfg_url = f"https://api.airtable.com/v0/{BASE_ID}/{SYSTEM_CONFIG_TABLE}"
+            rc = requests.get(cfg_url, headers=HEADERS, params={
+                "filterByFormula": "{Key}='last_detect_run'", "pageSize": 1,
+            }, timeout=10)
+            rc.raise_for_status()
+            cfg_recs = rc.json().get("records", [])
+            if cfg_recs:
+                raw = cfg_recs[0]["fields"].get("Value", "")
+        except Exception:
+            pass
+        # Fallback: Daily Changes Date Detected
+        if not raw:
+            params2 = {
+                "sort[0][field]": "Date Detected",
+                "sort[0][direction]": "desc",
+                "pageSize": 1,
+                "fields[]": ["Date Detected"],
+            }
+            r2 = requests.get(base_url, headers=HEADERS, params=params2, timeout=15)
+            r2.raise_for_status()
+            recs = r2.json().get("records", [])
+            if recs:
+                raw = recs[0]["fields"].get("Date Detected", "")
+
+        if raw and "T" in raw:
+            date_part, time_part = raw.split("T")
+            yy, mm, dd = date_part.split("-")
+            hh_mm = time_part[:5]
+            last_scan = f"{dd}.{mm} {hh_mm}"
+            # Check staleness (>30 hours since last scan)
+            try:
+                scan_dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                age = datetime.now(timezone.utc) - scan_dt
+                scan_stale = age > timedelta(hours=30)
+            except Exception:
+                pass
+        elif raw:
+            last_scan = raw
 
     except Exception as e:
         print(f"  [WARN] Cotton Sync status fetch failed: {e}")
