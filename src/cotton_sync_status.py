@@ -81,6 +81,9 @@ def fetch_cotton_sync_status():
             cfg_recs = rc.json().get("records", [])
             if cfg_recs:
                 raw = cfg_recs[0]["fields"].get("Value", "")
+                # New format: "2026-07-09T18:56:08 | step_summary" — extract timestamp
+                if " | " in raw:
+                    raw = raw.split(" | ")[0].strip()
         except Exception:
             pass
         # Fallback: Daily Changes Date Detected
