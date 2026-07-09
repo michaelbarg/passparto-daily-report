@@ -107,8 +107,12 @@ def fetch_cotton_sync_status():
             last_scan = f"{dd}.{mm} {hh_mm}"
             # Check staleness (>30 hours since last scan)
             try:
-                scan_dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-                age = datetime.now(timezone.utc) - scan_dt
+                scan_dt = datetime.fromisoformat(raw)
+                # If naive (no tz info), assume Israel time
+                if scan_dt.tzinfo is None:
+                    from zoneinfo import ZoneInfo
+                    scan_dt = scan_dt.replace(tzinfo=ZoneInfo("Asia/Jerusalem"))
+                age = datetime.now(timezone.utc) - scan_dt.astimezone(timezone.utc)
                 scan_stale = age > timedelta(hours=30)
             except Exception:
                 pass
