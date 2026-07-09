@@ -2,8 +2,10 @@
 
 Returns inventory-pending count (restock + zero + new_product only)
 and last-scan timestamp for the daily email approval line.
+Also returns scan_stale flag when last scan > 30 hours ago.
 """
 import os
+from datetime import datetime, timezone, timedelta
 
 import requests
 
@@ -26,13 +28,15 @@ def fetch_cotton_sync_status():
     """
     if not AIRTABLE_TOKEN:
         print("  [WARN] AIRTABLE_API_TOKEN not set — skipping Cotton Sync status")
-        return {"pending_count": 0, "restock_count": 0, "zero_count": 0, "last_scan_time": ""}
+        return {"pending_count": 0, "restock_count": 0, "zero_count": 0,
+                "last_scan_time": "", "scan_stale": False}
 
     base_url = f"https://api.airtable.com/v0/{BASE_ID}/{TABLE_ID}"
     restock = 0
     zero = 0
     new_prod = 0
     last_scan = ""
+    scan_stale = False
 
     try:
         # Count pending inventory rows by type
@@ -81,6 +85,13 @@ def fetch_cotton_sync_status():
                 yy, mm, dd = date_part.split("-")
                 hh_mm = time_part[:5]
                 last_scan = f"{dd}.{mm} {hh_mm}"
+                # Check staleness (>30 hours since last scan)
+                try:
+                    scan_dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                    age = datetime.now(timezone.utc) - scan_dt
+                    scan_stale = age > timedelta(hours=30)
+                except Exception:
+                    pass
             elif raw:
                 last_scan = raw
 
@@ -88,10 +99,11 @@ def fetch_cotton_sync_status():
         print(f"  [WARN] Cotton Sync status fetch failed: {e}")
 
     total = restock + zero + new_prod
-    print(f"  Cotton Sync: {total} pending ({restock} restock, {zero} zero, {new_prod} new), scan: {last_scan or '?'}")
+    print(f"  Cotton Sync: {total} pending ({restock} restock, {zero} zero, {new_prod} new), scan: {last_scan or '?'}, stale: {scan_stale}")
     return {
         "pending_count": total,
         "restock_count": restock,
         "zero_count": zero,
         "last_scan_time": last_scan,
+        "scan_stale": scan_stale,
     }

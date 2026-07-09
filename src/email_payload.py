@@ -74,4 +74,5 @@ def build_event_dict(data, insight):
         "cs_restock_count": data.get("cs_restock_count", 0),
         "cs_zero_count": data.get("cs_zero_count", 0),
         "cs_last_scan_time": data.get("cs_last_scan_time", ""),
+        "cs_scan_stale": data.get("cs_scan_stale", False),
     }

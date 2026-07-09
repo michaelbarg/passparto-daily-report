@@ -32,11 +32,32 @@
         </tr>
 
         <!-- ════════════════════════════════════════════ -->
-        <!-- COTTON SYNC — single approval line            -->
+        <!-- COTTON SYNC — always visible                  -->
         <!-- ════════════════════════════════════════════ -->
-        {% if event.cs_pending_count %}
+        {% if event.cs_scan_stale %}
+        <!-- Scanner stale alert (>30 hours) -->
         <tr>
           <td style="padding:16px 24px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#fef2f2;border:1px solid #fca5a5;border-right:4px solid #dc2626;border-radius:10px;">
+              <tr>
+                <td style="padding:14px 16px;">
+                  <p style="margin:0;font-size:15px;font-weight:700;color:#991b1b;">
+                    🔴 הסורק לא רץ מאז {{ event.cs_last_scan_time or '?' }} — בדוק Render
+                  </p>
+                  <p style="margin:2px 0 0;font-size:12px;color:#7f1d1d;">
+                    הסריקה האחרונה ישנה מ-30 שעות. ייתכן שה-cron מושבת או שיש תקלת deploy.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        {% endif %}
+        {% if event.cs_pending_count %}
+        <!-- Pending approvals -->
+        <tr>
+          <td style="padding:{% if event.cs_scan_stale %}8{% else %}16{% endif %}px 24px 0;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0"
                    style="background:#eef4ff;border:1px solid #c7dbff;border-right:4px solid #2563eb;border-radius:10px;">
               <tr>
@@ -54,6 +75,25 @@
                      style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:9px 16px;border-radius:8px;white-space:nowrap;">
                     פתח אישורים&nbsp;→
                   </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        {% elif not event.cs_scan_stale %}
+        <!-- No pending, scanner healthy — show last scan time -->
+        <tr>
+          <td style="padding:16px 24px 0;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#f0fdf4;border:1px solid #bbf7d0;border-right:4px solid #16a34a;border-radius:10px;">
+              <tr>
+                <td style="padding:14px 16px;">
+                  <p style="margin:0;font-size:14px;font-weight:600;color:#166534;">
+                    ✅ Cotton Sync — אין שינויי מלאי ממתינים
+                  </p>
+                  <p style="margin:2px 0 0;font-size:12px;color:#15803d;">
+                    סריקה אחרונה: {{ event.cs_last_scan_time or '?' }}
+                  </p>
                 </td>
               </tr>
             </table>
