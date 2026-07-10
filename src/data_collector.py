@@ -305,16 +305,32 @@ def collect_all():
     seg_data = get_segmentation_data()
 
     print("  Fetching new subscribers...")
-    new_subs = count_new_subscribers(yd_start, yd_end)
+    try:
+        new_subs = count_new_subscribers(yd_start, yd_end)
+    except Exception as e:
+        print(f"  [WARN] Klaviyo new_subscribers failed ({e}) — using 0")
+        new_subs = 0
 
     print("  Fetching campaign metrics (3 periods)...")
-    campaigns = get_campaign_metrics(time_windows)
+    try:
+        campaigns = get_campaign_metrics(time_windows)
+    except Exception as e:
+        print(f"  [WARN] Klaviyo campaign metrics failed ({e}) — using empty")
+        campaigns = []
 
     print("  Fetching flow metrics (3 periods)...")
-    flows = get_flow_metrics(time_windows)
+    try:
+        flows = get_flow_metrics(time_windows)
+    except Exception as e:
+        print(f"  [WARN] Klaviyo flow metrics failed ({e}) — using empty")
+        flows = []
 
     print("  Fetching customer email metrics...")
-    customer_emails = get_customer_email_metrics(time_windows)
+    try:
+        customer_emails = get_customer_email_metrics(time_windows)
+    except Exception as e:
+        print(f"  [WARN] Klaviyo customer email metrics failed ({e}) — using empty")
+        customer_emails = []
 
     print("  Fetching unfulfilled orders...")
     unfulfilled_orders = get_unfulfilled_orders()
